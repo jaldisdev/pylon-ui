@@ -3,6 +3,7 @@ import {Database, Moon, Sun, SunMoon} from "lucide-react";
 
 import {useConnectionStore} from "@/lib/state/connectionStore";
 import {useTheme, type Theme} from "@/lib/theme/useTheme";
+import {Tooltip} from "@/ui/Tooltip";
 
 // Cycles through the three theme modes in a fixed order on each click.
 const NEXT_THEME: Record<Theme, Theme> = {
@@ -30,14 +31,15 @@ export const TopBar: React.FC = () => {
         <Database size={16} strokeWidth={1.75} className="text-fg-muted" />
         <span className="font-medium">{branch}</span>
       </div>
-      <button
-        type="button"
-        onClick={() => setTheme(NEXT_THEME[theme])}
-        title={`Theme: ${theme}`}
-        className="flex h-7 w-7 items-center justify-center rounded-md text-fg-muted hover:bg-surface-hover hover:text-fg"
-      >
-        <ThemeIcon size={16} strokeWidth={1.75} />
-      </button>
+      <Tooltip label={`Theme: ${theme}`} side="bottom" align="end">
+        <button
+          type="button"
+          onClick={() => setTheme(NEXT_THEME[theme])}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-fg-muted hover:bg-surface-hover hover:text-fg"
+        >
+          <ThemeIcon size={16} strokeWidth={1.75} />
+        </button>
+      </Tooltip>
     </header>
   );
 };

@@ -36,6 +36,12 @@
   --color-success: var(--color-green-600);
   --color-success-fg: var(--color-white);
 
+  /* Tooltip — inverted vs. the page (dark bg here, flips light in .dark
+     below) so it reads clearly against either theme, matching gel-ui's
+     sidebar icon tooltips. */
+  --color-tooltip: #4c4c4c;
+  --color-tooltip-fg: #f5f5f5;
+
   /* Card shadow, used by src/ui/Card.tsx — every tab's root content. Two soft
      layers */
   --shadow-card: 0 0 8px rgba(0, 0, 0, 0.04), 0 0 4px rgba(0, 0, 0, 0.06);
@@ -62,6 +68,8 @@
   --color-accent-fg: var(--color-white);
   --color-success: var(--color-green-600);
   --color-success-fg: var(--color-white);
+  --color-tooltip: #adadad;
+  --color-tooltip-fg: #141414;
   --shadow-card: 0 0 8px rgba(0, 0, 0, 0.2), 0 0 4px rgba(0, 0, 0, 0.3);
 
   --syntax-keyword: var(--color-violet-400);
@@ -85,6 +93,8 @@
   --color-accent-fg: var(--color-accent-fg);
   --color-success: var(--color-success);
   --color-success-fg: var(--color-success-fg);
+  --color-tooltip: var(--color-tooltip);
+  --color-tooltip-fg: var(--color-tooltip-fg);
 
   --font-sans: "Roboto Flex Variable", "Roboto", sans-serif;
   --font-mono: "Roboto Mono Variable", "Roboto Mono", monospace;
