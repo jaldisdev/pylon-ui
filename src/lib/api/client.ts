@@ -34,8 +34,15 @@ export interface QueryResponse {
   duration_ms: number;
 }
 
+export interface ConnectionsResponse {
+  project: string | null;
+  // "main" (the base [database] block) plus any [database.<name>] sub-tables.
+  connections: string[];
+}
+
 export const api = {
   getSchema: () => request<SchemaResponse>("/schema"),
+  getConnections: () => request<ConnectionsResponse>("/connections"),
   runQuery: (pyql: string, params?: Record<string, unknown>, signal?: AbortSignal) =>
     request<QueryResponse>("/query", {
       method: "POST",
