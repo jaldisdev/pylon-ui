@@ -1,8 +1,10 @@
 import type React from "react";
-import {Moon, RadioTower, Sun, SunMoon} from "lucide-react";
+import {useState} from "react";
+import {Moon, RadioTower, Settings, Sun, SunMoon} from "lucide-react";
 
 import {useConnections} from "@/lib/api/useConnections";
 import {useTheme, type Theme} from "@/lib/theme/useTheme";
+import {GlobalsModal} from "@/features/globals/GlobalsModal";
 import {ConnectionMenu} from "@/ui/layout/ConnectionMenu";
 import {Tooltip} from "@/ui/Tooltip";
 
@@ -25,6 +27,7 @@ export const TopBar: React.FC = () => {
   const {data: connections} = useConnections();
   const {theme, setTheme} = useTheme();
   const ThemeIcon = THEME_ICON[theme];
+  const [globalsModalOpen, setGlobalsModalOpen] = useState(false);
 
   // Output
   return (
@@ -37,15 +40,27 @@ export const TopBar: React.FC = () => {
         </svg>
         <ConnectionMenu />
       </div>
-      <Tooltip label={`Theme: ${theme}`} side="bottom" align="end">
-        <button
-          type="button"
-          onClick={() => setTheme(NEXT_THEME[theme])}
-          className="flex items-center justify-center w-8 h-8 rounded-md text-fg-muted hover:bg-surface-hover hover:text-fg"
-        >
-          <ThemeIcon size={20} strokeWidth={1.75} />
-        </button>
-      </Tooltip>
+      <div className="flex items-center gap-1">
+        <Tooltip label="Session globals" side="bottom" align="end">
+          <button
+            type="button"
+            onClick={() => setGlobalsModalOpen(true)}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-fg-muted hover:bg-surface-hover hover:text-fg"
+          >
+            <Settings size={18} strokeWidth={1.75} />
+          </button>
+        </Tooltip>
+        <Tooltip label={`Theme: ${theme}`} side="bottom" align="end">
+          <button
+            type="button"
+            onClick={() => setTheme(NEXT_THEME[theme])}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-fg-muted hover:bg-surface-hover hover:text-fg"
+          >
+            <ThemeIcon size={20} strokeWidth={1.75} />
+          </button>
+        </Tooltip>
+      </div>
+      {globalsModalOpen && <GlobalsModal onClose={() => setGlobalsModalOpen(false)} />}
     </header>
   );
 };

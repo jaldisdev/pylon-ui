@@ -36,6 +36,53 @@ export const extractParams = (query: string): ExtractedParam[] => {
   return [...params.values()];
 };
 
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const INT_RE = /^-?\d+$/;
+const FLOAT_RE = /^-?\d+(\.\d+)?$/;
+const LOCAL_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const LOCAL_TIME_RE = /^\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+const LOCAL_DATETIME_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+const DATETIME_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/;
+
+// Validates a raw input string against the shape a cast/scalar type expects
+// — same short tokens coerceParamValue switches on — returning a
+// human-readable error, or null when valid. Used wherever a value is typed
+// in outside the query editor itself (e.g. the globals modal), where there's
+// no PyQL parser/backend round trip to catch a malformed value up front.
+export const validateCastValue = (raw: string, castType: string | null): string | null => {
+  switch (castType) {
+    case "uuid":
+      return UUID_RE.test(raw) ? null : "Expected a UUID, e.g. 0199a144-5473-8c2a-af9a-00049e57387b";
+    case "int16":
+    case "int32":
+    case "int64":
+      return INT_RE.test(raw) ? null : "Expected an integer";
+    case "float32":
+    case "float64":
+    case "decimal":
+      return FLOAT_RE.test(raw) ? null : "Expected a number";
+    case "bool":
+      return /^(true|false)$/i.test(raw) ? null : "Expected true or false";
+    case "json":
+      try {
+        JSON.parse(raw);
+        return null;
+      } catch {
+        return "Expected valid JSON";
+      }
+    case "local_date":
+      return LOCAL_DATE_RE.test(raw) ? null : "Expected YYYY-MM-DD";
+    case "local_time":
+      return LOCAL_TIME_RE.test(raw) ? null : "Expected HH:MM[:SS]";
+    case "local_datetime":
+      return LOCAL_DATETIME_RE.test(raw) ? null : "Expected YYYY-MM-DDTHH:MM[:SS]";
+    case "datetime":
+      return DATETIME_RE.test(raw) ? null : "Expected an ISO datetime";
+    default:
+      return null;
+  }
+};
+
 // Light client-side coercion from a raw input string to a value asyncpg can
 // bind, based on the detected cast keyword — not a full type system, just
 // covers the common scalar cases.

@@ -2,6 +2,8 @@
 // are used everywhere so this works unchanged behind the Vite dev proxy and
 // behind the same-origin /api mount in production.
 
+import {useGlobalsStore} from "@/lib/state/globalsStore";
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -38,6 +40,19 @@ export interface ConnectionsResponse {
   project: string | null;
   // "main" (the base [database] block) plus any [database.<name>] sub-tables.
   connections: string[];
+}
+
+export interface GlobalInfo {
+  module: string;
+  name: string;
+  typeName: string | null;
+  required: boolean;
+}
+
+export interface GlobalsResponse {
+  // Only settable session globals — computed globals (Global[T, "select
+  // ..."]) are derived at query time and never listed here.
+  globals: GlobalInfo[];
 }
 
 export interface ChatModelInfo {
@@ -80,10 +95,13 @@ export const api = {
   getSchema: () => request<SchemaResponse>("/schema"),
   getConnections: () => request<ConnectionsResponse>("/connections"),
   getModels: () => request<ModelsResponse>("/models"),
+  getGlobals: () => request<GlobalsResponse>("/globals"),
   runQuery: (pyql: string, params?: Record<string, unknown>, signal?: AbortSignal) =>
     request<QueryResponse>("/query", {
       method: "POST",
-      body: JSON.stringify({pyql, params}),
+      // Session globals (configured via the top bar's globals modal) apply
+      // to every query automatically — callers never need to pass them.
+      body: JSON.stringify({pyql, params, globals: useGlobalsStore.getState().values}),
       signal,
     }),
   runAiChat: (body: AiChatRequest, signal?: AbortSignal) =>

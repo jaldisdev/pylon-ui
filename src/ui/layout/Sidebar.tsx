@@ -8,7 +8,7 @@ import {Tooltip} from "@/ui/Tooltip";
 // Desktop vertical icon nav, one entry per tab. Hidden on mobile in favor of
 // MobileNav (see useIsMobile in Layout.tsx).
 export const Sidebar: React.FC = () => (
-  <nav className="flex w-14 shrink-0 flex-col items-center gap-1 py-3">
+  <nav className="flex w-14 shrink-0 flex-col items-center gap-1 pb-3">
     {tabs.map((tab) => (
       <Tooltip key={tab.path} label={tab.label} side="right">
         <NavLink

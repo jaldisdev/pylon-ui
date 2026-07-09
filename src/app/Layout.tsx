@@ -27,22 +27,26 @@ export const Layout: React.FC = () => {
   // (as valid) until then avoids a loading-state flash on every navigation.
   const isUnknownConnection = !!connections && !!branch && !connections.connections.includes(branch);
 
-  // Output
+  // Output — Sidebar spans the full height directly below TopBar; GlobalsBar
+  // sits in the content column so it's indented to the same level as `main`,
+  // matching Gel's layout (not full-bleed above the sidebar).
   return (
     <div className="flex h-dvh flex-col bg-bg text-fg">
       <TopBar />
-      <GlobalsBar />
       <div className="flex min-h-0 flex-1">
         {!isMobile && <Sidebar />}
-        <main className="flex min-h-0 min-w-0 flex-1 md:pr-2 md:pb-2">
-          {isUnknownConnection ? (
-            <Card>
-              <NotFound label={`No connection named "${branch}"`} />
-            </Card>
-          ) : (
-            <Outlet />
-          )}
-        </main>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <GlobalsBar />
+          <main className="flex min-h-0 min-w-0 flex-1 md:pr-2 md:pb-2">
+            {isUnknownConnection ? (
+              <Card>
+                <NotFound label={`No connection named "${branch}"`} />
+              </Card>
+            ) : (
+              <Outlet />
+            )}
+          </main>
+        </div>
       </div>
       {isMobile && <MobileNav />}
     </div>

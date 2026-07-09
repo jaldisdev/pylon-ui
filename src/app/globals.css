@@ -103,3 +103,12 @@
 body {
   font-family: var(--font-sans);
 }
+
+/* Browsers default <button> to cursor: default — every button in this app
+   is clickable, so make that the baseline instead of adding cursor-pointer
+   to each one individually. */
+@layer base {
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+}
