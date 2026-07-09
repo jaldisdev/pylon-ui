@@ -49,7 +49,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({entries, open, onClos
               <div className="truncate font-mono text-xs text-fg">{entry.pyql}</div>
               <div
                 className={clsx(
-                  "mt-0.5 text-[10px]",
+                  "mt-0.5 text-2xs",
                   entry.rowCount === null ? "text-red-500" : "text-fg-muted"
                 )}
               >

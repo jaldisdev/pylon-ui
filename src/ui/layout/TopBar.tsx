@@ -25,7 +25,7 @@ export const TopBar: React.FC = () => {
 
   // Output
   return (
-    <header className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-surface px-3">
+    <header className="flex h-11 shrink-0 items-center justify-between px-3">
       <div className="flex items-center gap-1.5 text-sm text-fg">
         <Database size={16} strokeWidth={1.75} className="text-fg-muted" />
         <span className="font-medium">{branch}</span>

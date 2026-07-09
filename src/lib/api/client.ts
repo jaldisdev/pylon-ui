@@ -44,9 +44,19 @@ export const api = {
     }),
 };
 
+export type SchemaFieldKind = "property" | "link" | "multiLink" | "computed" | "enum";
+
 export interface SchemaField {
   name: string;
-  type: string;
+  kind: SchemaFieldKind;
+  // Present for "link"/"multiLink" (the target type's "module::Name") and for
+  // "enum" (the enum type's own "module::Name").
+  target?: string;
+  // Canonical PyQL/EdgeQL-style type name for "property"/"computed" fields
+  // (e.g. "std::str", "std::uuid", "cal::local_date") — shown below the field
+  // name in the Data Explorer's column headers, and used to decide which
+  // types get a `<tag>` prefix on values (see lib/schema/typeTags.ts).
+  typeName?: string;
 }
 
 export interface SchemaType {

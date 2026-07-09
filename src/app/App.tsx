@@ -23,7 +23,7 @@ const App: React.FC = () => (
             <Route index element={<Navigate to="repl" replace />} />
             <Route path="repl" element={<ReplTab />} />
             <Route path="query" element={<QueryEditorTab />} />
-            <Route path="data" element={<DataExplorerTab />} />
+            <Route path="data/*" element={<DataExplorerTab />} />
             <Route path="ai" element={<AiTab />} />
           </Route>
           <Route path="*" element={<Navigate to="/main/repl" replace />} />

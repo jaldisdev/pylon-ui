@@ -7,21 +7,38 @@
    setting. See src/lib/theme/useTheme.tsx. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme {
+    --text-2sm: 0.8rem;
+    --text-2xs: 0.625rem;
+}
+
 /* Semantic color tokens, one definition per mode. Components use the
    `--color-*` utilities below (e.g. bg-surface, text-fg) instead of raw
    Tailwind palette classes, so every surface repaints together when the
    theme switches. */
+/* Values below (light/dark) are gel-ui's actual literal colors, not Tailwind
+   palette approximations — read directly from its theme.module.scss
+   (--page_background/--app_panel_background/--header_background/--Grey90).
+   The grid body reuses --color-surface (same tone as the card/panel) —
+   --color-header is the one lighter tone, for the grid's thead and other
+   in-card headers. */
 :root {
-  --color-bg: var(--color-neutral-50);
-  --color-surface: var(--color-white);
+  --color-bg: #ededed;
+  --color-surface: #f7f7f7;
+  --color-header: #fcfcfc;
   --color-surface-hover: var(--color-neutral-100);
-  --color-border: var(--color-neutral-200);
+  --color-surface-active: var(--color-neutral-200);
+  --color-border: #e6e6e6;
   --color-fg: var(--color-neutral-900);
   --color-fg-muted: var(--color-neutral-500);
   --color-accent: var(--color-violet-600);
   --color-accent-fg: var(--color-white);
   --color-success: var(--color-green-600);
   --color-success-fg: var(--color-white);
+
+  /* Card shadow, used by src/ui/Card.tsx — every tab's root content. Two soft
+     layers */
+  --shadow-card: 0 0 8px rgba(0, 0, 0, 0.04), 0 0 4px rgba(0, 0, 0, 0.06);
 
   /* PyQL syntax highlighting, used by src/lib/editor/theme.ts */
   --syntax-keyword: var(--color-violet-600);
@@ -33,16 +50,19 @@
 }
 
 .dark {
-  --color-bg: var(--color-neutral-950);
-  --color-surface: var(--color-neutral-900);
+  --color-bg: #141414;
+  --color-surface: #242424;
+  --color-header: #333333;
   --color-surface-hover: var(--color-neutral-800);
-  --color-border: var(--color-neutral-800);
+  --color-surface-active: var(--color-neutral-700);
+  --color-border: #4d4d4d;
   --color-fg: var(--color-neutral-100);
   --color-fg-muted: var(--color-neutral-400);
   --color-accent: var(--color-violet-500);
   --color-accent-fg: var(--color-white);
   --color-success: var(--color-green-600);
   --color-success-fg: var(--color-white);
+  --shadow-card: 0 0 8px rgba(0, 0, 0, 0.2), 0 0 4px rgba(0, 0, 0, 0.3);
 
   --syntax-keyword: var(--color-violet-400);
   --syntax-string: var(--color-green-400);
@@ -55,7 +75,9 @@
 @theme inline {
   --color-bg: var(--color-bg);
   --color-surface: var(--color-surface);
+  --color-header: var(--color-header);
   --color-surface-hover: var(--color-surface-hover);
+  --color-surface-active: var(--color-surface-active);
   --color-border: var(--color-border);
   --color-fg: var(--color-fg);
   --color-fg-muted: var(--color-fg-muted);

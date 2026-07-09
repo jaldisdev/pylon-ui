@@ -5,7 +5,8 @@ import {Check, ChevronRight, Copy} from "lucide-react";
 
 import type {SchemaResponse} from "@/lib/api/client";
 import {useSchema} from "@/lib/api/useSchema";
-import {lookupFieldTypeTag, type FieldTypeTag} from "@/lib/schema/typeTags";
+import {lookupFieldTypeTag} from "@/lib/schema/typeTags";
+import {ScalarValue} from "@/ui/ScalarValue";
 
 interface JsonTreeProps {
   value: unknown;
@@ -54,7 +55,7 @@ const CopyButton: React.FC<{value: unknown}> = ({value}) => {
         setCopied(true);
         setTimeout(() => setCopied(false), 1000);
       }}
-      className="hidden shrink-0 items-center gap-1 rounded px-1 text-[10px] tracking-wide text-fg-muted uppercase hover:text-fg group-hover/row:flex"
+      className="hidden shrink-0 items-center gap-1 rounded px-1 text-2xs tracking-wide text-fg-muted uppercase hover:text-fg group-hover/row:flex"
     >
       {copied ? <Check size={10} /> : <Copy size={10} />}
       {copied ? "Copied" : "Copy JSON"}
@@ -128,39 +129,4 @@ const JsonNode: React.FC<JsonNodeProps> = ({label, value, schema, parentPylonTyp
       <CopyButton value={value} />
     </div>
   );
-};
-
-const ScalarValue: React.FC<{value: unknown; typeTag: FieldTypeTag | null}> = ({value, typeTag}) => {
-  if (value === null || value === undefined) {
-    return <span className="text-fg-muted">{"{}"}</span>;
-  }
-
-  if (typeTag?.kind === "enum" && typeof value === "string") {
-    return (
-      <span>
-        <span className="text-fg-muted">
-          {typeTag.module}::{typeTag.name}.
-        </span>
-        <span className="font-semibold text-fg">{value}</span>
-      </span>
-    );
-  }
-
-  const tag = typeTag?.kind === "scalar" ? <span className="text-fg-muted">{`<${typeTag.tag}>`}</span> : null;
-
-  if (typeof value === "string") {
-    return (
-      <span>
-        {tag}
-        <span className="text-[var(--syntax-string)]">'{value}'</span>
-      </span>
-    );
-  }
-  if (typeof value === "number") {
-    return <span className="text-[var(--syntax-number)]">{value}</span>;
-  }
-  if (typeof value === "boolean") {
-    return <span className="text-[var(--syntax-number)]">{String(value)}</span>;
-  }
-  return <span>{String(value)}</span>;
 };

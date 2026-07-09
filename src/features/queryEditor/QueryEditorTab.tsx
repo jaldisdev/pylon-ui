@@ -11,6 +11,7 @@ import {CodeEditor, type CodeEditorHandle} from "@/lib/editor/CodeEditor";
 import {coerceParamValue, extractParams} from "@/lib/editor/lang-pyql/extractParams";
 import {useLocalStorageState} from "@/lib/hooks/useLocalStorageState";
 import {useTheme} from "@/lib/theme/useTheme";
+import {Card} from "@/ui/Card";
 import {IconToggle} from "@/ui/IconToggle";
 import {HistoryPanel, type HistoryEntry} from "@/features/queryEditor/HistoryPanel";
 import {ParamsPanel} from "@/features/queryEditor/ParamsPanel";
@@ -124,7 +125,7 @@ export const QueryEditorTab: React.FC = () => {
 
   // Output
   return (
-    <div className="flex h-full flex-col">
+    <Card>
       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-2">
         <button
           type="button"
@@ -204,6 +205,6 @@ export const QueryEditorTab: React.FC = () => {
           </Panel>
         </Group>
       </div>
-    </div>
+    </Card>
   );
 };

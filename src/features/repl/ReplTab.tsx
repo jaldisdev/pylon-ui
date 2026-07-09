@@ -6,6 +6,7 @@ import {useHotkeys} from "react-hotkeys-hook";
 import {api, ApiError} from "@/lib/api/client";
 import {CodeEditor, type CodeEditorHandle} from "@/lib/editor/CodeEditor";
 import {useTheme} from "@/lib/theme/useTheme";
+import {Card} from "@/ui/Card";
 import {ReplEntry} from "@/features/repl/ReplEntry";
 
 export interface HistoryEntry {
@@ -68,7 +69,7 @@ export const ReplTab: React.FC = () => {
 
   // Output
   return (
-    <div className="flex h-full flex-col">
+    <Card>
       <div className="flex-1 overflow-auto p-3">
         {history.map((entry) => (
           <ReplEntry key={entry.id} entry={entry} />
@@ -82,6 +83,6 @@ export const ReplTab: React.FC = () => {
           className="min-h-[4.5rem] rounded-md border border-border"
         />
       </div>
-    </div>
+    </Card>
   );
 };

@@ -1,23 +1,23 @@
 import type {SchemaResponse} from "@/lib/api/client";
 
 // A field's inferred display type, resolved from real schema data (not a
-// value-shape guess) — used by JsonTree to show `<uuid>`/`<std::datetime>`
-// tags and `module::Enum.Member` labels the way Gel's inspector does.
+// value-shape guess) — used by JsonTree/ScalarValue to show `<uuid>`/
+// `<std::datetime>` tags and `module::Enum.Member` labels the way Gel's
+// inspector does.
 export type FieldTypeTag = {kind: "scalar"; tag: string} | {kind: "enum"; module: string; name: string};
 
-const SCALAR_TAG_BY_PG_TYPE: Record<string, string> = {
-  uuid: "uuid",
-  "timestamp with time zone": "std::datetime",
-  timestamptz: "std::datetime",
-  "timestamp without time zone": "cal::local_datetime",
-  timestamp: "cal::local_datetime",
-  date: "cal::local_date",
-  json: "json",
-  jsonb: "json",
+// Only these typeNames get a `<tag>` prefix on their value — plain str/int/
+// bool/json are self-evident from their JS type already. Tag text matches
+// the (slightly inconsistent, short-vs-qualified) style seen in Gel's own
+// inspector: `<uuid>` but `<std::datetime>`.
+const TAG_BY_TYPE_NAME: Record<string, string> = {
+  "std::uuid": "uuid",
+  "std::datetime": "std::datetime",
+  "cal::local_datetime": "cal::local_datetime",
+  "cal::local_date": "cal::local_date",
+  "cal::local_time": "cal::local_time",
+  "std::duration": "std::duration",
 };
-
-// Postgres's format_type() wraps custom type names (e.g. enums) in double quotes.
-const unquotePgType = (pgType: string) => pgType.replace(/^"(.*)"$/, "$1");
 
 export const lookupFieldTypeTag = (
   schema: SchemaResponse | undefined,
@@ -31,9 +31,11 @@ export const lookupFieldTypeTag = (
   const field = type?.fields.find((f) => f.name === fieldName);
   if (!field) return null;
 
-  const enumDef = schema.enums.find((e) => e.name === unquotePgType(field.type));
-  if (enumDef) return {kind: "enum", module: enumDef.module, name: enumDef.name};
+  if (field.kind === "enum" && field.target) {
+    const [enumModule, enumName] = field.target.split("::");
+    return {kind: "enum", module: enumModule, name: enumName};
+  }
 
-  const scalarTag = SCALAR_TAG_BY_PG_TYPE[field.type];
-  return scalarTag ? {kind: "scalar", tag: scalarTag} : null;
+  const tag = field.typeName ? TAG_BY_TYPE_NAME[field.typeName] : undefined;
+  return tag ? {kind: "scalar", tag} : null;
 };

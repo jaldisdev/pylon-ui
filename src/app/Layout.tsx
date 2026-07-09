@@ -24,7 +24,7 @@ export const Layout: React.FC = () => {
       <GlobalsBar />
       <div className="flex min-h-0 flex-1">
         {!isMobile && <Sidebar />}
-        <main className="min-w-0 flex-1 overflow-auto">
+        <main className="flex min-h-0 min-w-0 flex-1 md:pr-2 md:pb-2">
           <Outlet />
         </main>
       </div>

@@ -19,7 +19,7 @@ export const MobileNav: React.FC = () => (
         }
       >
         <tab.icon size={20} strokeWidth={1.75} />
-        <span className="text-[10px]">{tab.label}</span>
+        <span className="text-2xs">{tab.label}</span>
       </NavLink>
     ))}
   </nav>
