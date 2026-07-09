@@ -40,13 +40,56 @@ export interface ConnectionsResponse {
   connections: string[];
 }
 
+export interface ChatModelInfo {
+  name: string;
+  model: string;
+  apiStyle: "openai" | "anthropic";
+}
+
+export interface ModelsResponse {
+  // Only "chat"-purpose models — embedding models are never user-selectable,
+  // they're picked implicitly via a type's VectorIndex.
+  models: ChatModelInfo[];
+}
+
+export interface AiChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface AiChatRequest {
+  modelName: string;
+  pylonType: string;
+  indexName: string | null;
+  searchQuery: string;
+  message: string;
+  history: AiChatMessage[];
+}
+
+export interface AiChatResult {
+  object: Record<string, unknown>;
+  distance: number;
+}
+
+export interface AiChatResponse {
+  reply: string;
+  results: AiChatResult[];
+}
+
 export const api = {
   getSchema: () => request<SchemaResponse>("/schema"),
   getConnections: () => request<ConnectionsResponse>("/connections"),
+  getModels: () => request<ModelsResponse>("/models"),
   runQuery: (pyql: string, params?: Record<string, unknown>, signal?: AbortSignal) =>
     request<QueryResponse>("/query", {
       method: "POST",
       body: JSON.stringify({pyql, params}),
+      signal,
+    }),
+  runAiChat: (body: AiChatRequest, signal?: AbortSignal) =>
+    request<AiChatResponse>("/ai/chat", {
+      method: "POST",
+      body: JSON.stringify(body),
       signal,
     }),
 };
@@ -66,10 +109,21 @@ export interface SchemaField {
   typeName?: string;
 }
 
+export interface VectorIndexInfo {
+  // null for a bare/default VectorIndex (not assigned to a named attribute).
+  indexName: string | null;
+  model: string;
+  // Fields the index was declared with (what actually got embedded) — the
+  // AI tab's Index select shows these, and /api/ai/chat uses them server-side
+  // to build its context, so the frontend never needs to pass fields itself.
+  fields: string[];
+}
+
 export interface SchemaType {
   name: string;
   module: string;
   fields: SchemaField[];
+  vectorIndexes: VectorIndexInfo[];
 }
 
 export interface SchemaEnum {
