@@ -3,7 +3,7 @@ import clsx from "clsx";
 import {X} from "lucide-react";
 
 export interface HistoryEntry {
-  id: number;
+  id: string;
   pyql: string;
   timestamp: number;
   rowCount: number | null; // null means the run errored
@@ -16,10 +16,9 @@ interface HistoryPanelProps {
   onSelect: (entry: HistoryEntry) => void;
 }
 
-// Slide-in side panel listing past queries run this session (in-memory only,
-// no persistence — a session realistically holds tens of entries, not
-// thousands, so no virtualization either). Click an entry to load it back
-// into the editor.
+// Slide-in side panel listing past queries, persisted to localStorage (see
+// useLocalStorageState in QueryEditorTab) so it survives a page reload,
+// matching Gel's UI. Capped at a few hundred entries, so no virtualization.
 export const HistoryPanel: React.FC<HistoryPanelProps> = ({entries, open, onClose, onSelect}) => {
   if (!open) return null;
 

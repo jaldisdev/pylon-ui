@@ -9,6 +9,7 @@ import {Columns2, History, Play, Rows2, Square} from "lucide-react";
 import {api, ApiError} from "@/lib/api/client";
 import {CodeEditor, type CodeEditorHandle} from "@/lib/editor/CodeEditor";
 import {coerceParamValue, extractParams} from "@/lib/editor/lang-pyql/extractParams";
+import {useLocalStorageState} from "@/lib/hooks/useLocalStorageState";
 import {useTheme} from "@/lib/theme/useTheme";
 import {IconToggle} from "@/ui/IconToggle";
 import {HistoryPanel, type HistoryEntry} from "@/features/queryEditor/HistoryPanel";
@@ -22,10 +23,14 @@ const ORIENTATION_OPTIONS = [
   {key: "vertical" as const, icon: Rows2, label: "Stacked"},
 ];
 
+const HISTORY_STORAGE_KEY = "pylon-ui-query-history";
+const MAX_HISTORY_ENTRIES = 200;
+
 // Query Editor: a PyQL input and its result, in a resizable split (toggle
 // between side-by-side and stacked), a parameters panel for $name params,
-// and a session-only query history side panel. Modeled on gel-ui's Query
-// Editor tab, trimmed to PyQL-only (no SQL/Visual-Builder modes, no explain).
+// and a query history side panel persisted to localStorage (matching Gel's
+// UI). Modeled on gel-ui's Query Editor tab, trimmed to PyQL-only (no SQL/
+// Visual-Builder modes, no explain).
 export const QueryEditorTab: React.FC = () => {
   const editorRef = useRef<CodeEditorHandle>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -35,7 +40,7 @@ export const QueryEditorTab: React.FC = () => {
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [orientation, setOrientation] = useState<Orientation>("horizontal");
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [history, setHistory] = useLocalStorageState<HistoryEntry[]>(HISTORY_STORAGE_KEY, []);
 
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,14 +74,20 @@ export const QueryEditorTab: React.FC = () => {
           setResult({rows: data.rows, durationMs: data.duration_ms});
           setError(null);
           setLastRunQueryText(pyql);
-          setHistory((h) => [...h, {id: h.length, pyql, timestamp: Date.now(), rowCount: data.rows.length}]);
+          setHistory((h) =>
+            [...h, {id: crypto.randomUUID(), pyql, timestamp: Date.now(), rowCount: data.rows.length}].slice(
+              -MAX_HISTORY_ENTRIES
+            )
+          );
         },
         onError: (err) => {
           if (err instanceof DOMException && err.name === "AbortError") return; // cancelled, not a real error
           setResult(null);
           setError(err instanceof ApiError ? err.message : String(err));
           setLastRunQueryText(pyql);
-          setHistory((h) => [...h, {id: h.length, pyql, timestamp: Date.now(), rowCount: null}]);
+          setHistory((h) =>
+            [...h, {id: crypto.randomUUID(), pyql, timestamp: Date.now(), rowCount: null}].slice(-MAX_HISTORY_ENTRIES)
+          );
         },
       }
     );
@@ -139,7 +150,7 @@ export const QueryEditorTab: React.FC = () => {
             className="flex h-7.5 items-center gap-1 rounded-md bg-surface-hover px-2 text-xs text-fg"
           >
             <Square size={12} strokeWidth={1.75} />
-            Cancel
+            <span>Cancel</span>
           </button>
         ) : (
           <button
@@ -148,12 +159,13 @@ export const QueryEditorTab: React.FC = () => {
             disabled={!canRun}
             title="Mod+Enter"
             className={clsx(
-              "flex h-7.5 items-center gap-1 rounded-md px-2 text-xs text-success-fg transition duration-300",
-              canRun ? "bg-success hover:opacity-90" : "cursor-not-allowed bg-success/40 opacity-60"
+              "flex items-center gap-2 h-7.5 rounded-md px-2 text-sm text-success-fg transition duration-300",
+              canRun ? "bg-success hover:opacity-90" : "cursor-not-allowed bg-success/50 opacity-75"
             )}
           >
-            <Play size={12} strokeWidth={1.75} />
-            Run
+            <Play size={14} strokeWidth={1.75} />
+            <span>Run</span>
+            <span className="leading-none font-light text-xs opacity-85">⌘+Enter</span>
           </button>
         )}
       </div>

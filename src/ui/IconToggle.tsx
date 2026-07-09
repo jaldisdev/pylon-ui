@@ -30,10 +30,11 @@ export const IconToggle = <T extends string>({
         title={option.label}
         onClick={() => onSelect(option.key)}
         className={clsx(
-          "flex h-6 w-6 items-center justify-center rounded",
+          "flex items-center justify-center w-6 h-6 rounded-sm",
           selected === option.key
             ? "bg-surface-hover text-accent"
-            : "text-fg-muted hover:text-fg"
+            : "text-fg-muted hover:text-fg",
+          "transition-colors duration-300"
         )}
       >
         <option.icon size={14} strokeWidth={1.75} />
