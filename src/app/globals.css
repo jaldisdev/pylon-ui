@@ -20,6 +20,8 @@
   --color-fg-muted: var(--color-neutral-500);
   --color-accent: var(--color-violet-600);
   --color-accent-fg: var(--color-white);
+  --color-success: var(--color-green-600);
+  --color-success-fg: var(--color-white);
 
   /* PyQL syntax highlighting, used by src/lib/editor/theme.ts */
   --syntax-keyword: var(--color-violet-600);
@@ -39,6 +41,8 @@
   --color-fg-muted: var(--color-neutral-400);
   --color-accent: var(--color-violet-500);
   --color-accent-fg: var(--color-white);
+  --color-success: var(--color-green-600);
+  --color-success-fg: var(--color-white);
 
   --syntax-keyword: var(--color-violet-400);
   --syntax-string: var(--color-green-400);
@@ -57,6 +61,8 @@
   --color-fg-muted: var(--color-fg-muted);
   --color-accent: var(--color-accent);
   --color-accent-fg: var(--color-accent-fg);
+  --color-success: var(--color-success);
+  --color-success-fg: var(--color-success-fg);
 
   --font-sans: "Roboto Flex Variable", "Roboto", sans-serif;
   --font-mono: "Roboto Mono Variable", "Roboto Mono", monospace;

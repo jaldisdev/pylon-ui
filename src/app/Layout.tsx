@@ -1,6 +1,7 @@
 import type React from "react";
 import {Outlet} from "react-router-dom";
 
+import {useSchema} from "@/lib/api/useSchema";
 import {useIsMobile} from "@/lib/hooks/useIsMobile";
 import {GlobalsBar} from "@/ui/layout/GlobalsBar";
 import {MobileNav} from "@/ui/layout/MobileNav";
@@ -11,6 +12,10 @@ import {TopBar} from "@/ui/layout/TopBar";
 // nav (mobile) alongside the active tab's content.
 export const Layout: React.FC = () => {
   const isMobile = useIsMobile();
+  // Fetched once here so it's warm in the TanStack Query cache by the time
+  // any tab (JsonTree, future Data Explorer) needs it — same "load schema on
+  // connect" idea as Gel's UI.
+  useSchema();
 
   // Output
   return (

@@ -14,6 +14,7 @@ const darkThemeComp = new Compartment();
 
 export interface CodeEditorHandle {
   getValue: () => string;
+  setValue: (value: string) => void;
   clear: () => void;
   focus: () => void;
 }
@@ -45,13 +46,16 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
 
+  const setValue = (value: string) => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({changes: {from: 0, to: view.state.doc.length, insert: value}});
+  };
+
   useImperativeHandle(ref, () => ({
     getValue: () => viewRef.current?.state.doc.toString() ?? "",
-    clear: () => {
-      const view = viewRef.current;
-      if (!view) return;
-      view.dispatch({changes: {from: 0, to: view.state.doc.length, insert: ""}});
-    },
+    setValue,
+    clear: () => setValue(""),
     focus: () => viewRef.current?.focus(),
   }));
 

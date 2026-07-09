@@ -36,10 +36,11 @@ export interface QueryResponse {
 
 export const api = {
   getSchema: () => request<SchemaResponse>("/schema"),
-  runQuery: (pyql: string, params?: Record<string, unknown>) =>
+  runQuery: (pyql: string, params?: Record<string, unknown>, signal?: AbortSignal) =>
     request<QueryResponse>("/query", {
       method: "POST",
       body: JSON.stringify({pyql, params}),
+      signal,
     }),
 };
 
@@ -54,6 +55,13 @@ export interface SchemaType {
   fields: SchemaField[];
 }
 
+export interface SchemaEnum {
+  name: string;
+  module: string;
+  members: string[];
+}
+
 export interface SchemaResponse {
   types: SchemaType[];
+  enums: SchemaEnum[];
 }
