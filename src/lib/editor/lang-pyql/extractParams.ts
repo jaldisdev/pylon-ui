@@ -112,14 +112,27 @@ const LOCAL_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const LOCAL_TIME_RE = /^\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
 const LOCAL_DATETIME_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
 const DATETIME_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/;
+// Loose Postgres interval shape ("1 day 2 hours", "45 minutes") — permissive
+// on purpose: unlike the other patterns here, this one hasn't been verified
+// against a real round trip (pylon-demo's schema has no Duration property to
+// test against), so it only rejects obviously-empty input rather than
+// asserting a precise grammar we haven't confirmed the backend expects.
+const DURATION_RE = /\S/;
+
+// castType may be the short form used by query-editor casts (`<int64>$x`,
+// already unqualified) or a schema pointer's fully-qualified typeName (e.g.
+// "std::int64", "cal::local_date") — strip any module prefix so both callers
+// hit the same switch cases.
+const shortCastType = (castType: string | null): string | null => (castType ? (castType.split("::").pop() ?? null) : null);
 
 // Validates a raw input string against the shape a cast/scalar type expects
 // — same short tokens coerceParamValue switches on — returning a
 // human-readable error, or null when valid. Used wherever a value is typed
-// in outside the query editor itself (e.g. the globals modal), where there's
-// no PyQL parser/backend round trip to catch a malformed value up front.
+// in outside the query editor itself (e.g. the globals modal, the Data
+// Explorer's inline cell editor), where there's no PyQL parser/backend round
+// trip to catch a malformed value up front.
 export const validateCastValue = (raw: string, castType: string | null): string | null => {
-  switch (castType) {
+  switch (shortCastType(castType)) {
     case "uuid":
       return UUID_RE.test(raw) ? null : "Expected a UUID, e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
     case "int16":
@@ -147,6 +160,10 @@ export const validateCastValue = (raw: string, castType: string | null): string 
       return LOCAL_DATETIME_RE.test(raw) ? null : "Expected YYYY-MM-DDTHH:MM[:SS]";
     case "datetime":
       return DATETIME_RE.test(raw) ? null : "Expected an ISO datetime";
+    case "duration":
+      return DURATION_RE.test(raw) ? null : "Expected a duration, e.g. '1 hour 30 minutes'";
+    case "bytes":
+      return raw.length > 0 ? null : "Expected a value";
     default:
       return null;
   }
@@ -156,7 +173,7 @@ export const validateCastValue = (raw: string, castType: string | null): string 
 // bind, based on the detected cast keyword — not a full type system, just
 // covers the common scalar cases.
 export const coerceParamValue = (raw: string, castType: string | null): unknown => {
-  switch (castType) {
+  switch (shortCastType(castType)) {
     case "int16":
     case "int32":
     case "int64":
@@ -169,6 +186,9 @@ export const coerceParamValue = (raw: string, castType: string | null): unknown 
       return raw.toLowerCase() === "true";
     case "json":
       return JSON.parse(raw);
+    // duration/bytes: passed through as the raw string — unverified against
+    // a real round trip (see the DURATION_RE comment above), so no coercion
+    // is applied beyond what every other unrecognized cast type already gets.
     default:
       return raw;
   }
