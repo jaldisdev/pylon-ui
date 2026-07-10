@@ -76,7 +76,12 @@ export interface AiChatRequest {
   modelName: string;
   pylonType: string;
   indexName: string | null;
-  searchQuery: string;
+  // Optional PyQL expression narrowing which objects vector::search's first
+  // argument scopes over, e.g. "select Type filter .field = value" — null
+  // (or empty) searches every object of pylonType instead.
+  contextQuery: string | null;
+  // Both the vector::search query text *and* the LLM's question — no
+  // separate search-text field.
   message: string;
   history: AiChatMessage[];
 }

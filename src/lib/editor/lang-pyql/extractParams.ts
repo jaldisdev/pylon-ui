@@ -91,7 +91,7 @@ const DATETIME_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d
 export const validateCastValue = (raw: string, castType: string | null): string | null => {
   switch (castType) {
     case "uuid":
-      return UUID_RE.test(raw) ? null : "Expected a UUID, e.g. 0199a144-5473-8c2a-af9a-00049e57387b";
+      return UUID_RE.test(raw) ? null : "Expected a UUID, e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
     case "int16":
     case "int32":
     case "int64":

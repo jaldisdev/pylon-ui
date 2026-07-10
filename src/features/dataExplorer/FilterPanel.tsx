@@ -35,7 +35,7 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({defaultValue, onApply, 
   // Output
   return (
     <div className="flex h-32 shrink-0 flex-col border-b border-border">
-      <CodeEditor ref={editorRef} defaultValue={defaultValue} dark={dark} placeholder=".name = 'Alice'" className="flex-1" />
+      <CodeEditor ref={editorRef} defaultValue={defaultValue} dark={dark} placeholder=".field = value" className="flex-1" />
       <div className="flex items-center justify-end gap-2 border-t border-border px-2 py-1.5">
         {error && <span className="mr-auto font-mono text-xs text-red-500">{error}</span>}
         <button

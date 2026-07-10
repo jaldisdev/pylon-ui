@@ -3,6 +3,9 @@ import {useMemo} from "react";
 
 import type {SchemaType} from "@/lib/api/client";
 import {useModels} from "@/lib/api/useModels";
+import {CodeEditor} from "@/lib/editor/CodeEditor";
+import {useSchema} from "@/lib/api/useSchema";
+import {useTheme} from "@/lib/theme/useTheme";
 import {Select, type SelectOption} from "@/ui/Select";
 
 // A bare/default VectorIndex has indexName === null — react-select needs a
@@ -16,11 +19,11 @@ interface SettingsPanelProps {
   pylonType: string | null;
   indexName: string | null;
   modelName: string | null;
-  searchQuery: string;
+  contextQuery: string;
   onTypeChange: (pylonType: string | null) => void;
   onIndexChange: (indexName: string | null) => void;
   onModelChange: (modelName: string | null) => void;
-  onSearchQueryChange: (query: string) => void;
+  onContextQueryChange: (query: string) => void;
 }
 
 const Field: React.FC<{label: string; className?: string; children: React.ReactNode}> = ({
@@ -35,20 +38,24 @@ const Field: React.FC<{label: string; className?: string; children: React.ReactN
 );
 
 // Right-hand settings rail for the AI tab's RAG search: which model answers,
-// which VectorIndex-bearing type/index to search, and the search term.
+// which VectorIndex-bearing type/index to search, and an optional Context
+// Query (a PyQL expression narrowing which objects vector::search scopes
+// over — empty searches every object of the type).
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   searchableTypes,
   selectedType,
   pylonType,
   indexName,
   modelName,
-  searchQuery,
+  contextQuery,
   onTypeChange,
   onIndexChange,
   onModelChange,
-  onSearchQueryChange,
+  onContextQueryChange,
 }) => {
   const {data: modelsData} = useModels();
+  const {data: schema} = useSchema();
+  const {resolvedTheme} = useTheme();
 
   const modelOptions = useMemo<SelectOption[]>(
     () => (modelsData?.models ?? []).map((m) => ({value: m.name, label: m.name})),
@@ -68,8 +75,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   );
   const promptOptions: SelectOption[] = [{value: "builtin::rag-default", label: "builtin::rag-default"}];
 
-  // Output — a compact 2-column grid (Search spanning both) on mobile,
-  // stacked full-width above the chat; a fixed sidebar on desktop.
+  // Output — a compact 2-column grid (Context Query spanning both) on
+  // mobile, stacked full-width above the chat; a fixed sidebar on desktop.
   return (
     <div className="grid grid-cols-2 gap-3 border-b border-border p-3 md:flex md:w-72 md:shrink-0 md:flex-col md:gap-4 md:overflow-y-auto md:border-b-0 md:border-l md:p-4">
       <Field label="Model">
@@ -104,12 +111,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       <Field label="Prompt">
         <Select options={promptOptions} value={promptOptions[0]} onChange={() => {}} isClearable={false} isDisabled />
       </Field>
-      <Field label="Search" className="col-span-2">
-        <input
-          value={searchQuery}
-          onChange={(e) => onSearchQueryChange(e.target.value)}
-          placeholder="Search term…"
-          className="h-10 w-full rounded-md border border-border bg-surface px-2.5 text-sm text-fg placeholder:text-fg-muted focus:border-accent focus:outline-none"
+      <Field label="Context Query (optional)" className="col-span-2">
+        <CodeEditor
+          key={pylonType}
+          defaultValue={contextQuery}
+          onChange={onContextQueryChange}
+          schema={schema}
+          dark={resolvedTheme === "dark"}
+          placeholder="select Type filter .field = value"
+          className="h-24 rounded-md border border-border"
         />
       </Field>
     </div>

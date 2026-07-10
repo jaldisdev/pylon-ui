@@ -35,7 +35,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({messages, canChat, isSendin
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-3">
           {messages.length === 0 && (
             <div className="flex h-full min-h-40 items-center justify-center text-sm text-fg-muted">
-              {canChat ? "Ask a question about the search results" : "Select a type and enter a search to start"}
+              {canChat ? "Ask a question about the search results" : "Select a model and type to start"}
             </div>
           )}
           {messages.map((m, i) => (

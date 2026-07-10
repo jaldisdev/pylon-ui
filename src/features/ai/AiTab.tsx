@@ -10,9 +10,10 @@ import {ChatPanel, type ChatMessage} from "@/features/ai/ChatPanel";
 import {SettingsPanel} from "@/features/ai/SettingsPanel";
 
 // RAG test wizard: pick a chat model + a VectorIndex-bearing type/index +
-// a search term, then chat about the matched results. Every chat turn
-// re-runs the same search server-side (see pylon/server/asgi.py's
-// /api/ai/chat) — cheap since the search term doesn't change mid-conversation.
+// an optional Context Query (a PyQL expression narrowing which objects are
+// searched — empty means "search every object of the type"), then chat.
+// Each message's own text doubles as the vector::search query — no separate
+// search-text field (see pylon/server/asgi.py's /api/ai/chat).
 export const AiTab: React.FC = () => {
   const {data: schema} = useSchema();
   const {data: modelsData} = useModels();
@@ -20,7 +21,7 @@ export const AiTab: React.FC = () => {
   const [modelName, setModelName] = useState<string | null>(null);
   const [pylonType, setPylonType] = useState<string | null>(null);
   const [indexName, setIndexName] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [contextQuery, setContextQuery] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   const searchableTypes = useMemo(() => schema?.types.filter((t) => t.vectorIndexes.length > 0) ?? [], [schema]);
@@ -47,10 +48,11 @@ export const AiTab: React.FC = () => {
     setPylonType(value);
     const type = searchableTypes.find((t) => `${t.module}::${t.name}` === value);
     setIndexName(type?.vectorIndexes[0]?.indexName ?? null);
+    setContextQuery(""); // a prior type's context query wouldn't apply to the new type
     setMessages([]);
   };
 
-  const canChat = !!modelName && !!pylonType && searchQuery.trim().length > 0;
+  const canChat = !!modelName && !!pylonType;
 
   const chatMutation = useMutation({
     mutationFn: (text: string) =>
@@ -58,7 +60,7 @@ export const AiTab: React.FC = () => {
         modelName: modelName!,
         pylonType: pylonType!,
         indexName,
-        searchQuery,
+        contextQuery: contextQuery.trim() || null,
         message: text,
         history: messages.map(({role, content}) => ({role, content})),
       }),
@@ -84,11 +86,11 @@ export const AiTab: React.FC = () => {
           pylonType={pylonType}
           indexName={indexName}
           modelName={modelName}
-          searchQuery={searchQuery}
+          contextQuery={contextQuery}
           onTypeChange={handleTypeChange}
           onIndexChange={setIndexName}
           onModelChange={setModelName}
-          onSearchQueryChange={setSearchQuery}
+          onContextQueryChange={setContextQuery}
         />
         <ChatPanel messages={messages} canChat={canChat} isSending={chatMutation.isPending} onSend={sendMessage} />
       </div>
