@@ -26,9 +26,9 @@ export const parseStack = (schema: SchemaResponse, splat: string): StackEntry[] 
     const id = rest[i];
     const fieldName = rest[i + 1];
     const currentType = stack[stack.length - 1].pylonType;
-    const field = findType(schema, currentType)?.fields.find((f) => f.name === fieldName);
-    if (!field?.target) break; // invalid/stale path segment — stop here rather than crash
-    stack.push({pylonType: field.target, parent: {id, fieldName, parentType: currentType}});
+    const pointer = findType(schema, currentType)?.pointers.find((p) => p.name === fieldName);
+    if (!pointer?.target) break; // invalid/stale path segment — stop here rather than crash
+    stack.push({pylonType: pointer.target, parent: {id, fieldName, parentType: currentType}});
   }
   return stack;
 };

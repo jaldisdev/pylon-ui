@@ -20,11 +20,11 @@ interface DataExplorerViewProps {
   basePath: string; // e.g. "/main/data"
 }
 
-// Builds the field shape fragment for a SELECT — links/multi-links are
+// Builds the shape fragment for a SELECT — links/multi-links are
 // requested as `{id}` only (the grid just needs a count + the id to
 // navigate), verified against the real backend rather than assumed.
-const buildShape = (fields: {name: string; kind: string}[]) =>
-  fields.map((f) => (f.kind === "link" || f.kind === "multiLink" ? `${f.name}: {id}` : f.name)).join(", ");
+const buildShape = (pointers: {name: string; kind: string}[]) =>
+  pointers.map((p) => (p.kind === "link" || p.kind === "multiLink" ? `${p.name}: {id}` : p.name)).join(", ");
 
 // One nested-view level: header (type picker or back-button breadcrumb),
 // row count/refresh, filter toggle, and the grid itself. Re-mounted (see the
@@ -37,7 +37,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
 
   const current = stack[stack.length - 1];
   const schemaType = schema?.types.find((t) => `${t.module}::${t.name}` === current.pylonType);
-  const fields = schemaType?.fields ?? [];
+  const pointers = schemaType?.pointers ?? [];
 
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("ASC");
@@ -45,8 +45,8 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
   const [filterOpen, setFilterOpen] = useState(false);
 
   const query = useMemo(() => {
-    if (fields.length === 0) return null;
-    const shape = buildShape(fields);
+    if (pointers.length === 0) return null;
+    const shape = buildShape(pointers);
     const orderClause = sortField ? ` order by .${sortField} ${sortDir}` : "";
     const filterClause = filterExpr ? ` filter ${filterExpr}` : "";
 
@@ -65,7 +65,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
       params: undefined,
       extractField: null as string | null,
     };
-  }, [fields, sortField, sortDir, filterExpr, current]);
+  }, [pointers, sortField, sortDir, filterExpr, current]);
 
   const dataQuery = useQuery({
     queryKey: ["dataExplorer", "objects", current, sortField, sortDir, filterExpr],
@@ -97,9 +97,9 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
 
   const goBack = () => navigate(`${basePath}/${stackToPath(stack.slice(0, -1))}`);
 
-  const navigateLink = (row: Row, field: {name: string}) => {
+  const navigateLink = (row: Row, pointer: {name: string}) => {
     const id = (row.id as string | undefined) ?? "";
-    navigate(`${basePath}/${stackToPath(stack)}/${id}/${field.name}`);
+    navigate(`${basePath}/${stackToPath(stack)}/${id}/${pointer.name}`);
   };
 
   const toggleSort = (fieldName: string) => {
@@ -185,7 +185,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
       {schemaType ? (
         <DataGrid
           pylonType={current.pylonType}
-          fields={fields}
+          pointers={pointers}
           rows={dataQuery.data ?? []}
           schema={schema}
           sortField={sortField}

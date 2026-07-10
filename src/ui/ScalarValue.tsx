@@ -1,10 +1,10 @@
 import type React from "react";
 
-import type {FieldTypeTag} from "@/lib/schema/typeTags";
+import type {PointerTypeTag} from "@/lib/schema/typeTags";
 
 interface ScalarValueProps {
   value: unknown;
-  typeTag: FieldTypeTag | null;
+  typeTag: PointerTypeTag | null;
   // Drops the `module::Enum.` prefix, the `<tag>` type prefix, and the quotes
   // around strings — used by the Data Explorer grid, where the column header
   // already names the type, so repeating it per cell would just be noise.
@@ -68,7 +68,7 @@ export const ScalarValue: React.FC<ScalarValueProps> = ({value, typeTag, compact
   }
   if (typeof value === "object") {
     // NamedTuple/JSON-typed properties (e.g. Person.location: Point) are
-    // still "scalar" fields schema-wise, but their JS value is an object —
+    // still "scalar" properties schema-wise, but their JS value is an object —
     // a compact JSON preview beats the default `[object Object]`.
     return <span className="text-fg-muted">{JSON.stringify(value)}</span>;
   }

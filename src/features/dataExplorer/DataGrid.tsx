@@ -5,8 +5,8 @@ import {getCoreRowModel, useReactTable, type ColumnDef} from "@tanstack/react-ta
 import {useVirtualizer} from "@tanstack/react-virtual";
 import {ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, Menu} from "lucide-react";
 
-import type {SchemaField, SchemaResponse} from "@/lib/api/client";
-import {lookupFieldTypeTag} from "@/lib/schema/typeTags";
+import type {SchemaPointer, SchemaResponse} from "@/lib/api/client";
+import {lookupPointerTypeTag} from "@/lib/schema/typeTags";
 import {ScalarValue} from "@/ui/ScalarValue";
 
 export type SortDir = "ASC" | "DESC";
@@ -14,25 +14,26 @@ type Row = Record<string, unknown>;
 
 interface DataGridProps {
   pylonType: string; // "module::Name" of the row's own type, for type-tag lookups
-  fields: SchemaField[];
+  pointers: SchemaPointer[];
   rows: Row[];
   schema: SchemaResponse | undefined;
   sortField: string | null;
   sortDir: SortDir | null;
   onSort: (fieldName: string) => void;
-  onNavigateLink: (row: Row, field: SchemaField) => void;
+  onNavigateLink: (row: Row, pointer: SchemaPointer) => void;
 }
 
-// Only plain scalar/enum fields (other than id) are sortable — links,
-// multi-links, and computed fields aren't, matching gel-ui's grid.
-const isSortable = (field: SchemaField) => (field.kind === "property" || field.kind === "enum") && field.name !== "id";
+// Only plain scalar/enum properties (other than id) are sortable — links,
+// multi-links, and computed pointers aren't, matching gel-ui's grid.
+const isSortable = (pointer: SchemaPointer) =>
+  (pointer.kind === "property" || pointer.kind === "enum") && pointer.name !== "id";
 
-// The type description shown below a field's name in its column header —
+// The type description shown below a pointer's name in its column header —
 // e.g. "std::str", "default::Gender", "multi default::Tag".
-const headerTypeLabel = (field: SchemaField): string | null => {
-  if (field.kind === "link" || field.kind === "enum") return field.target ?? null;
-  if (field.kind === "multiLink") return field.target ? `multi ${field.target}` : "multi";
-  return field.typeName ?? null;
+const headerTypeLabel = (pointer: SchemaPointer): string | null => {
+  if (pointer.kind === "link" || pointer.kind === "enum") return pointer.target ?? null;
+  if (pointer.kind === "multiLink") return pointer.target ? `multi ${pointer.target}` : "multi";
+  return pointer.typeName ?? null;
 };
 
 // Virtualized (rows) data grid: a row-number column, a pinned id column,
@@ -41,7 +42,7 @@ const headerTypeLabel = (field: SchemaField): string | null => {
 // multi-link cells show "N objects →" and are clickable to navigate.
 export const DataGrid: React.FC<DataGridProps> = ({
   pylonType,
-  fields,
+  pointers,
   rows,
   schema,
   sortField,
@@ -52,8 +53,8 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const columns = useMemo<ColumnDef<Row>[]>(
-    () => fields.map((field) => ({id: field.name, accessorKey: field.name})),
-    [fields]
+    () => pointers.map((pointer) => ({id: pointer.name, accessorKey: pointer.name})),
+    [pointers]
   );
 
   const table = useReactTable({data: rows, columns, getCoreRowModel: getCoreRowModel()});
@@ -81,32 +82,32 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 <Menu size={12} strokeWidth={1.75} />
               </th>
               {headerGroup.headers.map((header) => {
-                const field = fields.find((f) => f.name === header.id)!;
-                const sortable = isSortable(field);
-                const typeLabel = headerTypeLabel(field);
+                const pointer = pointers.find((p) => p.name === header.id)!;
+                const sortable = isSortable(pointer);
+                const typeLabel = headerTypeLabel(pointer);
                 return (
                   <th
                     key={header.id}
                     className={clsx(
                       "max-w-60 border-b border-border px-2 py-1.5 text-left font-mono whitespace-nowrap",
-                      field.name === "id" && "sticky left-10 z-20 bg-header"
+                      pointer.name === "id" && "sticky left-10 z-20 bg-header"
                     )}
                   >
                     <button
                       type="button"
                       disabled={!sortable}
-                      onClick={() => onSort(field.name)}
+                      onClick={() => onSort(pointer.name)}
                       className="flex w-full items-center justify-between gap-2 text-left disabled:cursor-default"
                     >
                       <span className="min-w-0">
                         <div className="truncate font-[450] text-2sm text-fg">
-                          {field.name}
-                          {field.kind === "computed" && ":="}
+                          {pointer.name}
+                          {pointer.kind === "computed" && ":="}
                         </div>
                         {typeLabel && <div className="truncate text-2xs font-normal text-fg-muted">{typeLabel}</div>}
                       </span>
                       {sortable &&
-                        (sortField === field.name ? (
+                        (sortField === pointer.name ? (
                           sortDir === "ASC" ? (
                             <ArrowUp size={14} className="shrink-0 text-accent" />
                           ) : (
@@ -135,19 +136,19 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 <td className="sticky left-0 w-10 border-b border-border bg-surface px-2 py-2.5 text-right font-mono text-xs text-fg-muted group-hover/row:bg-surface-hover">
                   {virtualRow.index + 1}
                 </td>
-                {fields.map((field) => {
-                  const isLink = field.kind === "link" || field.kind === "multiLink";
+                {pointers.map((pointer) => {
+                  const isLink = pointer.kind === "link" || pointer.kind === "multiLink";
                   return (
                     <td
-                      key={field.name}
-                      onClick={() => isLink && onNavigateLink(row, field)}
+                      key={pointer.name}
+                      onClick={() => isLink && onNavigateLink(row, pointer)}
                       className={clsx(
                         "max-w-60 overflow-hidden border-b border-border px-2 py-2.5 font-mono text-ellipsis whitespace-nowrap",
-                        field.name === "id" && "sticky left-10 bg-surface group-hover/row:bg-surface-hover",
+                        pointer.name === "id" && "sticky left-10 bg-surface group-hover/row:bg-surface-hover",
                         isLink && "cursor-pointer"
                       )}
                     >
-                      <DataCell pylonType={pylonType} field={field} value={row[field.name]} schema={schema} />
+                      <DataCell pylonType={pylonType} pointer={pointer} value={row[pointer.name]} schema={schema} />
                     </td>
                   );
                 })}
@@ -167,14 +168,14 @@ export const DataGrid: React.FC<DataGridProps> = ({
 
 interface DataCellProps {
   pylonType: string;
-  field: SchemaField;
+  pointer: SchemaPointer;
   value: unknown;
   schema: SchemaResponse | undefined;
 }
 
-const DataCell: React.FC<DataCellProps> = ({pylonType, field, value, schema}) => {
-  if (field.kind === "link" || field.kind === "multiLink") {
-    const items = field.kind === "multiLink" ? ((value as unknown[] | null) ?? []) : value ? [value] : [];
+const DataCell: React.FC<DataCellProps> = ({pylonType, pointer, value, schema}) => {
+  if (pointer.kind === "link" || pointer.kind === "multiLink") {
+    const items = pointer.kind === "multiLink" ? ((value as unknown[] | null) ?? []) : value ? [value] : [];
     return (
       <span className={clsx("flex items-center gap-1", items.length === 0 ? "text-fg-muted" : "text-fg")}>
         {items.length === 0 ? "{}" : `${items.length} object${items.length === 1 ? "" : "s"}`}
@@ -183,6 +184,6 @@ const DataCell: React.FC<DataCellProps> = ({pylonType, field, value, schema}) =>
     );
   }
 
-  const typeTag = lookupFieldTypeTag(schema, pylonType, field.name);
+  const typeTag = lookupPointerTypeTag(schema, pylonType, pointer.name);
   return <ScalarValue value={value} typeTag={typeTag} compact />;
 };

@@ -5,7 +5,7 @@ import {Check, ChevronRight, Copy} from "lucide-react";
 
 import type {SchemaResponse} from "@/lib/api/client";
 import {useSchema} from "@/lib/api/useSchema";
-import {lookupFieldTypeTag} from "@/lib/schema/typeTags";
+import {lookupPointerTypeTag} from "@/lib/schema/typeTags";
 import {ScalarValue} from "@/ui/ScalarValue";
 
 interface JsonTreeProps {
@@ -117,7 +117,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({label, value, schema, parentPylonTyp
     );
   }
 
-  const typeTag = label !== undefined ? lookupFieldTypeTag(schema, parentPylonType, label) : null;
+  const typeTag = label !== undefined ? lookupPointerTypeTag(schema, parentPylonType, label) : null;
 
   // Output
   return (
