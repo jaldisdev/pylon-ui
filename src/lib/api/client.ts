@@ -140,6 +140,18 @@ export interface SchemaPointer {
   // pointer name in the Data Explorer's column headers, and used to decide
   // which types get a `<tag>` prefix on values (see lib/schema/typeTags.ts).
   typeName?: string;
+  // "property"/"link" only — sourced from Pylon's own PointerMeta, not
+  // derivable from a value's shape. A readonly pointer is still settable
+  // once, at insert time — only post-creation updates are blocked.
+  readonly?: boolean;
+  required?: boolean;
+  // True if the pointer has a default/default_factory — lets the insert-row
+  // UI skip a required-but-defaulted property (e.g. a sequence number)
+  // instead of blocking commit waiting for a value the DB will supply.
+  hasDefault?: boolean;
+  // "multiLink" only, when it's a junction-typed multi-link (e.g.
+  // `MultiLink[Tag, through(ProductTag)]`) — the junction type's "module::Name".
+  through?: string;
 }
 
 export interface VectorIndexInfo {
@@ -155,6 +167,12 @@ export interface VectorIndexInfo {
 export interface SchemaType {
   name: string;
   module: string;
+  // Real Pylon inheritance info (@pylon.abstract/@pylon.interface + concrete
+  // subtypes) — an abstract type can't be inserted directly; the Data
+  // Explorer's Insert button offers a subtype picker when there's more than
+  // one concrete option instead.
+  abstract: boolean;
+  bases: string[]; // direct Pylon base types' "module::Name", if any
   pointers: SchemaPointer[];
   vectorIndexes: VectorIndexInfo[];
 }
