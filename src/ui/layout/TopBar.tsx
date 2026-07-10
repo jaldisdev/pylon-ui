@@ -1,6 +1,6 @@
 import type React from "react";
 import {useState} from "react";
-import {Moon, RadioTower, Settings, Sun, SunMoon} from "lucide-react";
+import {Dock, Moon, Settings, Sun, SunMoon} from "lucide-react";
 
 import Logo from "@/assets/logo.svg?react";
 import {useConnections} from "@/lib/api/useConnections";
@@ -39,7 +39,7 @@ export const TopBar: React.FC = () => {
       </div>
 
       <div className="flex items-center gap-1.5 text-sm text-fg">
-        <RadioTower size={16} strokeWidth={1.75} className="text-fg-muted" />
+        <Dock size={16} strokeWidth={1.75} className="text-fg-muted" />
         <span className="font-medium">{connections?.project ?? "pylon"}</span>
         <svg width="8" height="17" viewBox="0 0 8 17" fill="none" className="ml-1.5 text-fg-muted">
           <path d="M7.66602 0.78125L1.73828 16.2207H0.185547L6.12305 0.78125H7.66602Z" fill="currentColor" />

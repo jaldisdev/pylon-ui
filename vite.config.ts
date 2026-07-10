@@ -21,6 +21,9 @@ export default defineConfig(({mode}) => {
         "@": fileURLToPath(new URL("./src", import.meta.url)),
       },
     },
+    define: {
+      'APP_VERSION': JSON.stringify(process.env.npm_package_version),
+    },
     server: {
       port: 8080,
       proxy: {

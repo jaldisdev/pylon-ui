@@ -108,12 +108,12 @@ export const DataGrid: React.FC<DataGridProps> = ({
                       {sortable &&
                         (sortField === field.name ? (
                           sortDir === "ASC" ? (
-                            <ArrowUp size={10} className="shrink-0 text-accent" />
+                            <ArrowUp size={14} className="shrink-0 text-accent" />
                           ) : (
-                            <ArrowDown size={10} className="shrink-0 text-accent" />
+                            <ArrowDown size={14} className="shrink-0 text-accent" />
                           )
                         ) : (
-                          <ArrowUpDown size={10} className="shrink-0 text-fg-muted" />
+                          <ArrowUpDown size={14} className="shrink-0 text-fg-muted" />
                         ))}
                     </button>
                   </th>

@@ -2,7 +2,8 @@ import type React from "react";
 import {QueryClientProvider} from "@tanstack/react-query";
 import {Navigate, Route, BrowserRouter, Routes} from "react-router-dom";
 
-import {AiTab} from "@/features/ai/AiTab";
+import { AiTab } from "@/features/ai/AiTab";
+import { DashboardTab } from "@/features/dashboard/DashboardTab";
 import {DataExplorerTab} from "@/features/dataExplorer/DataExplorerTab";
 import {QueryEditorTab} from "@/features/queryEditor/QueryEditorTab";
 import {ReplTab} from "@/features/repl/ReplTab";
@@ -18,9 +19,9 @@ const App: React.FC = () => (
     <ThemeProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/main/repl" replace />} />
+          <Route path="/" element={<Navigate to="/main" replace />} />
           <Route path=":branch" element={<Layout />}>
-            <Route index element={<Navigate to="repl" replace />} />
+            <Route index element={<DashboardTab />} />
             <Route path="repl" element={<ReplTab />} />
             <Route path="query" element={<QueryEditorTab />} />
             <Route path="data/*" element={<DataExplorerTab />} />
