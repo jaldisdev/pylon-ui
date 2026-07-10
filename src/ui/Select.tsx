@@ -15,6 +15,13 @@ type Props = ReactSelectProps<SelectOption, false, GroupBase<SelectOption>>;
 export const Select: React.FC<Props> = (props) => (
   <ReactSelect
     unstyled
+    menuPlacement="auto"
+    isSearchable={false}
+    // Portalled to <body> so the menu escapes any scrollable/overflow-hidden
+    // ancestor (e.g. the Query Editor's params panel) instead of being
+    // clipped by it — z-index alone can't fix that, only escaping the
+    // ancestor's overflow box can.
+    menuPortalTarget={document.body}
     classNames={{
       control: ({isFocused, isDisabled}) =>
         clsx(
@@ -27,7 +34,8 @@ export const Select: React.FC<Props> = (props) => (
       input: () => "text-fg",
       indicatorSeparator: () => "hidden",
       dropdownIndicator: () => "text-fg-muted px-1",
-      menu: () => "z-30 mt-1 rounded-md border border-border bg-surface shadow-[var(--shadow-card)] overflow-hidden",
+      menuPortal: () => "z-50",
+      menu: () => "mt-1 rounded-md border border-border bg-surface shadow-[var(--shadow-card)] overflow-hidden",
       menuList: () => "p-1 max-h-60",
       option: ({isFocused, isSelected}) =>
         clsx(

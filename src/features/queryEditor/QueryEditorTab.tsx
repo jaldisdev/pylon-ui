@@ -244,6 +244,7 @@ export const QueryEditorTab: React.FC = () => {
               params={params}
               values={paramValues}
               errors={paramErrors}
+              schema={schema}
               onChange={(name, raw) => setParamValues((v) => ({...v, [name]: raw}))}
             />
           </Panel>

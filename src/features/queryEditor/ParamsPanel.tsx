@@ -1,22 +1,36 @@
 import type React from "react";
 import clsx from "clsx";
 
+import type {SchemaResponse} from "@/lib/api/client";
 import type {ExtractedParam} from "@/lib/editor/lang-pyql/extractParams";
+import {Select, type SelectOption} from "@/ui/Select";
 
 interface ParamsPanelProps {
   params: ExtractedParam[];
   values: Record<string, string>;
   // name -> error message, or null when the current value is valid/empty.
   errors: Record<string, string | null>;
+  schema: SchemaResponse | undefined;
   onChange: (name: string, raw: string) => void;
 }
+
+// A cast's typeName is "module::Name" (or just "Name" for the default
+// module — see extractParams.ts); enums are looked up the same way schema
+// fields resolve their enum tags elsewhere in the app.
+const findEnum = (schema: SchemaResponse | undefined, castType: string | null) => {
+  if (!schema || !castType) return null;
+  const [module, name] = castType.includes("::") ? castType.split("::") : ["default", castType];
+  return schema.enums.find((e) => e.module === module && e.name === name) ?? null;
+};
 
 // One labeled input per $name parameter detected in the query text, styled
 // after Gel's own param inputs — a floating cast-type tag in the input's top
 // right corner, which turns red (along with the input's border) once the
-// value is invalid, or the field is required and still empty. Only rendered
-// when the query actually has parameters.
-export const ParamsPanel: React.FC<ParamsPanelProps> = ({params, values, errors, onChange}) => {
+// value is invalid, or the field is required and still empty. Enum-cast
+// params get a Select of the enum's members instead of free text, matching
+// Gel — clearable when the param is optional, so it can be reset to unset.
+// Only rendered when the query actually has parameters.
+export const ParamsPanel: React.FC<ParamsPanelProps> = ({params, values, errors, schema, onChange}) => {
   if (params.length === 0) return null;
 
   // Output
@@ -33,33 +47,47 @@ export const ParamsPanel: React.FC<ParamsPanelProps> = ({params, values, errors,
           const error = param.castConflict ?? errors[param.name];
           const isMissingRequired = param.required && raw.trim() === "";
           const invalid = !!error || isMissingRequired;
+          const paramEnum = findEnum(schema, param.castType);
+
           return (
             <div key={param.name} className="flex items-start gap-2">
               <span className="w-20 shrink-0 pt-2.5 font-mono text-2xs text-fg-muted">${param.name}</span>
               <div className="min-w-0 flex-1">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={raw}
-                    onChange={(e) => onChange(param.name, e.target.value)}
-                    disabled={!!param.castConflict}
+                {paramEnum ? (
+                  <Select
+                    options={paramEnum.members.map((m): SelectOption => ({value: m, label: m}))}
+                    value={raw ? {value: raw, label: raw} : null}
+                    onChange={(opt) => onChange(param.name, opt?.value ?? "")}
+                    isClearable={!param.required}
+                    isDisabled={!!param.castConflict}
                     placeholder={param.required ? "required" : "optional"}
-                    className={clsx(
-                      "h-9 w-full rounded-md border bg-surface pr-14 pl-2.5 font-mono text-sm text-fg outline-none disabled:opacity-50",
-                      invalid ? "border-[var(--syntax-operator)]" : "border-border focus:border-accent"
-                    )}
+                    className={invalid ? "[&>div]:border-[var(--syntax-operator)]" : undefined}
                   />
-                  {param.castType && (
-                    <span
+                ) : (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={raw}
+                      onChange={(e) => onChange(param.name, e.target.value)}
+                      disabled={!!param.castConflict}
+                      placeholder={param.required ? "required" : "optional"}
                       className={clsx(
-                        "absolute top-1 right-1 rounded px-1.5 py-0.5 text-2xs font-medium",
-                        invalid ? "bg-[var(--syntax-operator)] text-white" : "bg-surface-active text-fg-muted"
+                        "h-10 w-full rounded-md border bg-surface pr-14 pl-2.5 font-mono text-sm text-fg outline-none disabled:opacity-50",
+                        invalid ? "border-[var(--syntax-operator)]" : "border-border focus:border-accent"
                       )}
-                    >
-                      {param.castType}
-                    </span>
-                  )}
-                </div>
+                    />
+                    {param.castType && (
+                      <span
+                        className={clsx(
+                          "absolute top-1 right-1 rounded px-1.5 py-0.5 text-2xs font-medium",
+                          invalid ? "bg-[var(--syntax-operator)] text-white" : "bg-surface-active text-fg-muted"
+                        )}
+                      >
+                        {param.castType}
+                      </span>
+                    )}
+                  </div>
+                )}
                 {error && <div className="mt-1 text-2xs text-[var(--syntax-operator)]">{error}</div>}
               </div>
             </div>

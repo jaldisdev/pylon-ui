@@ -30,15 +30,45 @@ interface CastForm {
 // Cast { Keyword? Name } is the shape produced by the grammar for
 // `<optional int64>$age` / `<str>$name` — confirmed by inspecting the actual
 // parse tree, since the grammar's inlined "castStart"/">" tokens don't
-// appear as nodes.
+// appear as nodes. A *qualified* type name (`<default::Gender>`) splits
+// across multiple sibling nodes (Keyword "default", an error-recovery "::"
+// token, then Name "Gender") — confirmed the same way — so the type name is
+// reconstructed by spanning from the first remaining node to the last, not
+// read off a single node. This also means "default" (the module prefix)
+// parses as a Keyword just like "optional"/"required" do, so the leading
+// keyword is only consumed when its *text* actually matches one of those.
 const extractCastForm = (query: string, cast: SyntaxNode): CastForm => {
   let node: SyntaxNode | null = cast.firstChild;
   let keyword: string | null = null;
   if (node?.type.is("Keyword")) {
-    keyword = getNodeText(query, node).toLowerCase();
-    node = node.nextSibling;
+    const text = getNodeText(query, node).toLowerCase();
+    if (text === "optional" || text === "required") {
+      keyword = text;
+      node = node.nextSibling;
+    }
   }
-  return {keyword, typeName: node ? getNodeText(query, node) : null};
+  if (!node) return {keyword, typeName: null};
+  let last = node;
+  while (last.nextSibling) last = last.nextSibling;
+  return {keyword, typeName: query.slice(node.from, last.to)};
+};
+
+// Fallback for when the tree doesn't produce a clean Cast node before this
+// param at all — confirmed to happen specifically for `<optional
+// module::Name>` (e.g. `<optional default::Gender>`): the module prefix
+// ("default") lexes as a Keyword, and having *two* keyword-like tokens in a
+// row (the "optional" keyword slot, then the module-as-keyword) breaks the
+// grammar's error recovery badly enough that no Cast node is produced at
+// all (confirmed against gel-ui's own identical lang-edgeql grammar too —
+// not a PyQL-specific bug). The raw text is unambiguous even when the tree
+// isn't, so this reads the cast straight off the substring immediately
+// before the parameter instead of walking the (malformed) tree.
+const CAST_TEXT_RE = /<\s*(optional|required)?\s*([^<>]+?)\s*>\s*$/i;
+
+const extractCastFormFromText = (query: string, paramStart: number): CastForm => {
+  const match = CAST_TEXT_RE.exec(query.slice(0, paramStart));
+  if (!match) return {keyword: null, typeName: null};
+  return {keyword: match[1] ? match[1].toLowerCase() : null, typeName: match[2].trim()};
 };
 
 const describeCastForm = (form: CastForm): string =>
@@ -55,7 +85,7 @@ export const extractParams = (query: string): ExtractedParam[] => {
   for (const node of paramNodes) {
     const name = getNodeText(query, node).slice(1); // strip leading "$"
     const cast = node.prevSibling?.type.is("Cast") ? node.prevSibling : null;
-    const form = cast ? extractCastForm(query, cast) : {keyword: null, typeName: null};
+    const form = cast ? extractCastForm(query, cast) : extractCastFormFromText(query, node.from);
     const list = forms.get(name);
     if (list) list.push(form);
     else forms.set(name, [form]);
