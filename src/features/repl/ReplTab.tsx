@@ -4,6 +4,7 @@ import {useMutation} from "@tanstack/react-query";
 import {useHotkeys} from "react-hotkeys-hook";
 
 import {api, ApiError} from "@/lib/api/client";
+import {useSchema} from "@/lib/api/useSchema";
 import {CodeEditor, type CodeEditorHandle} from "@/lib/editor/CodeEditor";
 import {useTheme} from "@/lib/theme/useTheme";
 import {Card} from "@/ui/Card";
@@ -24,6 +25,7 @@ export const ReplTab: React.FC = () => {
   const editorRef = useRef<CodeEditorHandle>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const {resolvedTheme} = useTheme();
+  const {data: schema} = useSchema();
 
   const mutation = useMutation({
     mutationFn: (pyql: string) => api.runQuery(pyql),
@@ -78,6 +80,7 @@ export const ReplTab: React.FC = () => {
       <div className="border-t border-border p-2">
         <CodeEditor
           ref={editorRef}
+          schema={schema}
           dark={resolvedTheme === "dark"}
           placeholder="SELECT Type { field, ... } — Mod+Enter to run"
           className="min-h-[4.5rem] rounded-md border border-border"

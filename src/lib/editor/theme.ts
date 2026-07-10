@@ -35,6 +35,26 @@ export const editorTheme = (dark: boolean) =>
       ".cm-tooltip-autocomplete": {
         backgroundColor: "var(--color-surface)",
         border: "1px solid var(--color-border)",
+        borderRadius: "8px",
+        overflow: "hidden",
+        boxShadow: "var(--shadow-card)",
+      },
+      ".cm-tooltip.cm-tooltip-autocomplete > ul": {
+        maxHeight: "220px",
+        fontFamily: "var(--font-mono)",
+        fontSize: "13px",
+      },
+      ".cm-tooltip.cm-tooltip-autocomplete > ul > li": {
+        lineHeight: "28px",
+        padding: "0 10px",
+      },
+      ".cm-tooltip-autocomplete ul li[aria-selected]": {
+        backgroundColor: "var(--color-success)",
+        color: "var(--color-success-fg)",
+      },
+      ".cm-completionMatchedText": {
+        textDecoration: "none",
+        fontWeight: "600",
       },
     },
     {dark}

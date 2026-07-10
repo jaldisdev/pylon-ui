@@ -7,10 +7,13 @@ import {defaultKeymap, history, historyKeymap} from "@codemirror/commands";
 import {bracketMatching, syntaxHighlighting, indentOnInput} from "@codemirror/language";
 import {closeBrackets, closeBracketsKeymap, autocompletion} from "@codemirror/autocomplete";
 
-import {pyql} from "@/lib/editor/lang-pyql/pyql";
+import type {SchemaResponse} from "@/lib/api/client";
+import {getTypeCompletions} from "@/lib/editor/lang-pyql/completions";
+import {pyql, pyqlLanguage} from "@/lib/editor/lang-pyql/pyql";
 import {editorTheme, highlightStyle} from "@/lib/editor/theme";
 
 const darkThemeComp = new Compartment();
+const autocompleteComp = new Compartment();
 
 export interface CodeEditorHandle {
   getValue: () => string;
@@ -25,6 +28,11 @@ export interface CodeEditorProps {
   dark: boolean;
   className?: string;
   placeholder?: string;
+  // When provided, offers type-name completions after select/insert/update/
+  // delete (see lib/editor/lang-pyql/completions.ts). Omitted entirely
+  // (rather than an empty schema) where it doesn't apply, e.g. before the
+  // schema has loaded.
+  schema?: SchemaResponse;
   ref?: React.Ref<CodeEditorHandle>;
 }
 
@@ -41,6 +49,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   dark,
   className,
   placeholder,
+  schema,
   ref,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -79,6 +88,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
           pyql(),
           keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap]),
           darkThemeComp.of(editorTheme(dark)),
+          autocompleteComp.of(schema ? [pyqlLanguage.data.of({autocomplete: getTypeCompletions(schema)})] : []),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) onChange?.(update.state.doc.toString());
           }),
@@ -97,6 +107,16 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   useLayoutEffect(() => {
     viewRef.current?.dispatch({effects: darkThemeComp.reconfigure(editorTheme(dark))});
   }, [dark]);
+
+  // Re-wire completions once schema loads (it's fetched async, so it's
+  // usually still undefined at mount) and whenever it changes thereafter.
+  useLayoutEffect(() => {
+    viewRef.current?.dispatch({
+      effects: autocompleteComp.reconfigure(
+        schema ? [pyqlLanguage.data.of({autocomplete: getTypeCompletions(schema)})] : []
+      ),
+    });
+  }, [schema]);
 
   // overflow-hidden so CodeMirror's own inner background/gutters (which don't
   // know about the wrapper's rounded corners) get clipped to match, instead

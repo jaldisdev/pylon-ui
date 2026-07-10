@@ -7,6 +7,7 @@ import {Group, Panel, Separator} from "react-resizable-panels";
 import {Columns2, History, Play, Rows2, Square} from "lucide-react";
 
 import {api, ApiError} from "@/lib/api/client";
+import {useSchema} from "@/lib/api/useSchema";
 import {CodeEditor, type CodeEditorHandle} from "@/lib/editor/CodeEditor";
 import {coerceParamValue, extractParams, validateCastValue} from "@/lib/editor/lang-pyql/extractParams";
 import {useLocalStorageState, useSessionStorageState} from "@/lib/hooks/useLocalStorageState";
@@ -38,6 +39,7 @@ export const QueryEditorTab: React.FC = () => {
   const editorRef = useRef<CodeEditorHandle>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const {resolvedTheme} = useTheme();
+  const {data: schema} = useSchema();
 
   // sessionStorage (not localStorage) — survives switching to another tab
   // (e.g. Data Explorer to look up an id) and back, but not closing the tab,
@@ -233,6 +235,7 @@ export const QueryEditorTab: React.FC = () => {
               ref={editorRef}
               defaultValue={queryText}
               onChange={setQueryText}
+              schema={schema}
               dark={resolvedTheme === "dark"}
               placeholder="SELECT Type { field, ... }"
               className="flex-1"
