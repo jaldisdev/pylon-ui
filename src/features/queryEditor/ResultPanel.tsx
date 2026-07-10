@@ -38,12 +38,16 @@ export const ResultPanel: React.FC<ResultPanelProps> = ({isRunning, result, erro
     return <div className="flex h-full items-center justify-center text-sm text-fg-muted">No result yet</div>;
   }
 
-  // Output
+  // Output — the row count/duration is a sticky footer (like a Finder status
+  // bar), not part of the scrolling content, so it stays visible regardless
+  // of scroll position.
   return (
-    <div className="h-full overflow-auto p-3">
-      <JsonTree value={result.rows} />
-      <div className="mt-1.5 text-xs text-fg-muted">
-        {result.rows.length} row{result.rows.length === 1 ? "" : "s"} · {result.durationMs.toFixed(1)}ms
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex-1 overflow-auto p-3">
+        <JsonTree value={result.rows} />
+      </div>
+      <div className="flex h-7 shrink-0 select-none items-center justify-center bg-surface text-2xs text-fg-muted">
+        {result.rows.length} object{result.rows.length === 1 ? "" : "s"} · {result.durationMs.toFixed(1)}ms
       </div>
     </div>
   );

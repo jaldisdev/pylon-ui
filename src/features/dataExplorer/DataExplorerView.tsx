@@ -144,7 +144,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
         <div className="flex items-center gap-1.5 font-mono text-2sm text-fg-muted">
           {rowCount !== null ? (
             <>
-              {rowCount} item{rowCount === 1 ? "" : "s"}
+              {rowCount} object{rowCount === 1 ? "" : "s"}
               <button
                 type="button"
                 onClick={() => dataQuery.refetch()}

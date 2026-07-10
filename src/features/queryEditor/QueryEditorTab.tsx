@@ -8,8 +8,8 @@ import {Columns2, History, Play, Rows2, Square} from "lucide-react";
 
 import {api, ApiError} from "@/lib/api/client";
 import {CodeEditor, type CodeEditorHandle} from "@/lib/editor/CodeEditor";
-import {coerceParamValue, extractParams} from "@/lib/editor/lang-pyql/extractParams";
-import {useLocalStorageState} from "@/lib/hooks/useLocalStorageState";
+import {coerceParamValue, extractParams, validateCastValue} from "@/lib/editor/lang-pyql/extractParams";
+import {useLocalStorageState, useSessionStorageState} from "@/lib/hooks/useLocalStorageState";
 import {useTheme} from "@/lib/theme/useTheme";
 import {Card} from "@/ui/Card";
 import {IconToggle} from "@/ui/IconToggle";
@@ -26,6 +26,8 @@ const ORIENTATION_OPTIONS = [
 
 const HISTORY_STORAGE_KEY = "pylon-ui-query-history";
 const MAX_HISTORY_ENTRIES = 200;
+const DRAFT_TEXT_KEY = "pylon-ui-query-draft-text";
+const DRAFT_PARAMS_KEY = "pylon-ui-query-draft-params";
 
 // Query Editor: a PyQL input and its result, in a resizable split (toggle
 // between side-by-side and stacked), a parameters panel for $name params,
@@ -37,8 +39,12 @@ export const QueryEditorTab: React.FC = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const {resolvedTheme} = useTheme();
 
-  const [queryText, setQueryText] = useState("");
-  const [paramValues, setParamValues] = useState<Record<string, string>>({});
+  // sessionStorage (not localStorage) — survives switching to another tab
+  // (e.g. Data Explorer to look up an id) and back, but not closing the tab,
+  // matching Gel's own "current input + params" draft persistence, distinct
+  // from the permanent (localStorage) history below.
+  const [queryText, setQueryText] = useSessionStorageState(DRAFT_TEXT_KEY, "");
+  const [paramValues, setParamValues] = useSessionStorageState<Record<string, string>>(DRAFT_PARAMS_KEY, {});
   const [orientation, setOrientation] = useState<Orientation>("horizontal");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useLocalStorageState<HistoryEntry[]>(HISTORY_STORAGE_KEY, []);
@@ -48,8 +54,22 @@ export const QueryEditorTab: React.FC = () => {
   const [lastRunQueryText, setLastRunQueryText] = useState<string | null>(null);
 
   const params = useMemo(() => extractParams(queryText), [queryText]);
+  // Recomputed on every keystroke — same live-validation pattern as the
+  // globals modal, so a malformed param value blocks Run before the backend
+  // ever sees it, with the reason for the block shown right on the field.
+  const paramErrors = useMemo(() => {
+    const result: Record<string, string | null> = {};
+    for (const p of params) {
+      const raw = paramValues[p.name]?.trim();
+      result[p.name] = raw ? validateCastValue(raw, p.castType) : null;
+    }
+    return result;
+  }, [params, paramValues]);
+  const hasParamErrors =
+    Object.values(paramErrors).some((e) => e !== null) ||
+    params.some((p) => p.castConflict !== null || (p.required && !paramValues[p.name]?.trim()));
   const isOutdated = result !== null && lastRunQueryText !== null && queryText !== lastRunQueryText;
-  const canRun = queryText.trim().length > 0;
+  const canRun = queryText.trim().length > 0 && !hasParamErrors;
 
   const mutation = useMutation({
     mutationFn: ({pyql, paramsDict}: {pyql: string; paramsDict?: Record<string, unknown>}) => {
@@ -72,22 +92,44 @@ export const QueryEditorTab: React.FC = () => {
       {pyql, paramsDict},
       {
         onSuccess: (data) => {
-          setResult({rows: data.rows, durationMs: data.duration_ms});
+          const result = {rows: data.rows, durationMs: data.duration_ms};
+          setResult(result);
           setError(null);
           setLastRunQueryText(pyql);
           setHistory((h) =>
-            [...h, {id: crypto.randomUUID(), pyql, timestamp: Date.now(), rowCount: data.rows.length}].slice(
-              -MAX_HISTORY_ENTRIES
-            )
+            [
+              ...h,
+              {
+                id: crypto.randomUUID(),
+                pyql,
+                timestamp: Date.now(),
+                rowCount: data.rows.length,
+                paramValues: {...paramValues},
+                result,
+                error: null,
+              },
+            ].slice(-MAX_HISTORY_ENTRIES)
           );
         },
         onError: (err) => {
           if (err instanceof DOMException && err.name === "AbortError") return; // cancelled, not a real error
+          const message = err instanceof ApiError ? err.message : String(err);
           setResult(null);
-          setError(err instanceof ApiError ? err.message : String(err));
+          setError(message);
           setLastRunQueryText(pyql);
           setHistory((h) =>
-            [...h, {id: crypto.randomUUID(), pyql, timestamp: Date.now(), rowCount: null}].slice(-MAX_HISTORY_ENTRIES)
+            [
+              ...h,
+              {
+                id: crypto.randomUUID(),
+                pyql,
+                timestamp: Date.now(),
+                rowCount: null,
+                paramValues: {...paramValues},
+                result: null,
+                error: message,
+              },
+            ].slice(-MAX_HISTORY_ENTRIES)
           );
         },
       }
@@ -97,6 +139,12 @@ export const QueryEditorTab: React.FC = () => {
   const loadHistoryEntry = (entry: HistoryEntry) => {
     editorRef.current?.setValue(entry.pyql);
     setQueryText(entry.pyql);
+    // Fallbacks guard against entries persisted before result/param caching
+    // was added — localStorage may still hold those from an earlier session.
+    setParamValues(entry.paramValues ?? {});
+    setResult(entry.result ?? null);
+    setError(entry.error ?? null);
+    setLastRunQueryText(entry.pyql);
     setHistoryOpen(false);
   };
 
@@ -183,6 +231,7 @@ export const QueryEditorTab: React.FC = () => {
           <Panel defaultSize={50} minSize={20} className="flex flex-col">
             <CodeEditor
               ref={editorRef}
+              defaultValue={queryText}
               onChange={setQueryText}
               dark={resolvedTheme === "dark"}
               placeholder="SELECT Type { field, ... }"
@@ -191,6 +240,7 @@ export const QueryEditorTab: React.FC = () => {
             <ParamsPanel
               params={params}
               values={paramValues}
+              errors={paramErrors}
               onChange={(name, raw) => setParamValues((v) => ({...v, [name]: raw}))}
             />
           </Panel>
