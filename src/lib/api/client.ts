@@ -24,8 +24,18 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   });
 
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new ApiError(res.status, body || res.statusText);
+    const text = await res.text().catch(() => "");
+    // The backend's error responses are {"error": "..."} — extract the
+    // actual message instead of surfacing the raw JSON blob. Falls back to
+    // the raw text for non-JSON error bodies (e.g. a proxy/gateway error).
+    let message = text || res.statusText;
+    try {
+      const parsed = JSON.parse(text) as {error?: unknown};
+      if (typeof parsed.error === "string") message = parsed.error;
+    } catch {
+      // not JSON — keep the raw text
+    }
+    throw new ApiError(res.status, message);
   }
 
   return res.json() as Promise<T>;
