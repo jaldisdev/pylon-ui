@@ -2,6 +2,7 @@ import type React from "react";
 import {useState} from "react";
 import {Moon, RadioTower, Settings, Sun, SunMoon} from "lucide-react";
 
+import Logo from "@/assets/logo.svg?react";
 import {useConnections} from "@/lib/api/useConnections";
 import {useTheme, type Theme} from "@/lib/theme/useTheme";
 import {GlobalsModal} from "@/features/globals/GlobalsModal";
@@ -31,7 +32,12 @@ export const TopBar: React.FC = () => {
 
   // Output
   return (
-    <header className="flex h-11 shrink-0 items-center justify-between px-3">
+    <header className="flex h-11 shrink-0 items-center mb-2 px-3">
+      <div className="flex items-center gap-x-2.5 mr-3 md:mr-6 ml-1">
+        <Logo className="mr-1 h-6" />
+        <span className="hidden md:block font-[550] text-lg">Pylon</span>
+      </div>
+
       <div className="flex items-center gap-1.5 text-sm text-fg">
         <RadioTower size={16} strokeWidth={1.75} className="text-fg-muted" />
         <span className="font-medium">{connections?.project ?? "pylon"}</span>
@@ -40,7 +46,7 @@ export const TopBar: React.FC = () => {
         </svg>
         <ConnectionMenu />
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 ml-auto">
         <Tooltip label="Session globals" side="bottom" align="end">
           <button
             type="button"

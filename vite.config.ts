@@ -1,5 +1,6 @@
 import {defineConfig, loadEnv} from "vite";
 import react from "@vitejs/plugin-react";
+import svgr from "vite-plugin-svgr";
 import tailwindcss from "@tailwindcss/vite";
 import {fileURLToPath, URL} from "node:url";
 
@@ -12,7 +13,9 @@ export default defineConfig(({mode}) => {
   const apiTarget = env.PYLON_SERVE_URL || "http://localhost:5656";
 
   return {
-    plugins: [react(), tailwindcss()],
+    // exportType: "default" — a plain `import Logo from "./logo.svg"` gives
+    // the React component directly, no `?react` suffix or named import needed.
+    plugins: [react(), svgr({svgrOptions: {exportType: "default"}}), tailwindcss()],
     resolve: {
       alias: {
         "@": fileURLToPath(new URL("./src", import.meta.url)),
