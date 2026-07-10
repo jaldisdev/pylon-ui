@@ -33,6 +33,10 @@ export interface CodeEditorProps {
   // (rather than an empty schema) where it doesn't apply, e.g. before the
   // schema has loaded.
   schema?: SchemaResponse;
+  // Display-only mode (e.g. the Review Changes modal's generated-PyQL
+  // preview) — same syntax highlighting/theme as the interactive editor,
+  // just non-editable, no cursor/history/autocomplete.
+  readOnly?: boolean;
   ref?: React.Ref<CodeEditorHandle>;
 }
 
@@ -50,6 +54,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   className,
   placeholder,
   schema,
+  readOnly,
   ref,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -93,6 +98,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             if (update.docChanged) onChange?.(update.state.doc.toString());
           }),
           ...(placeholder ? [placeholderExt(placeholder)] : []),
+          ...(readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
         ],
       }),
       parent: containerRef.current,

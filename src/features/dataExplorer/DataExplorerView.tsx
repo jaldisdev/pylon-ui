@@ -2,16 +2,18 @@ import type React from "react";
 import {useMemo, useState} from "react";
 import {useNavigate} from "react-router-dom";
 import {useQuery} from "@tanstack/react-query";
-import {ArrowLeft, Filter, RefreshCw} from "lucide-react";
+import {ArrowLeft, Filter, Link2, RefreshCw} from "lucide-react";
 import clsx from "clsx";
 
 import {api} from "@/lib/api/client";
 import {useSchema} from "@/lib/api/useSchema";
 import {useTheme} from "@/lib/theme/useTheme";
-import {DataGrid, type SortDir} from "@/features/dataExplorer/DataGrid";
+import {DataGrid, type LinkEditMode, type SortDir} from "@/features/dataExplorer/DataGrid";
 import {FilterPanel} from "@/features/dataExplorer/FilterPanel";
+import {InsertRowButton} from "@/features/dataExplorer/InsertRowButton";
 import {ObjectTypeSelect} from "@/features/dataExplorer/ObjectTypeSelect";
 import {stackToPath, type StackEntry} from "@/features/dataExplorer/stack";
+import {useDataEditsStore} from "@/features/dataExplorer/state/editsStore";
 
 type Row = Record<string, unknown>;
 
@@ -43,6 +45,18 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
   const [sortDir, setSortDir] = useState<SortDir>("ASC");
   const [filterExpr, setFilterExpr] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
+  // "Edit links" mode for a nested link view — while on, the grid shows
+  // every object of the target type (not just currently-linked ones) with a
+  // checkbox/radio per row, matching gel-ui's link-picker-is-the-grid design.
+  const [linkEditModeOn, setLinkEditModeOn] = useState(false);
+  const createNewRow = useDataEditsStore((s) => s.createNewRow);
+
+  // The parent's own pointer for this link (only set when nested) — tells us
+  // whether it's a single-link (radio, exclusive) or multi-link (checkbox),
+  // and gates the "Edit links" toggle (hidden for computed backlinks).
+  const parentSchemaType = schema?.types.find((t) => `${t.module}::${t.name}` === current.parent?.parentType);
+  const parentPointer = parentSchemaType?.pointers.find((p) => p.name === current.parent?.fieldName);
+  const isSingleLink = parentPointer?.kind === "link";
 
   const query = useMemo(() => {
     if (pointers.length === 0) return null;
@@ -50,25 +64,29 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
     const orderClause = sortField ? ` order by .${sortField} ${sortDir}` : "";
     const filterClause = filterExpr ? ` filter ${filterExpr}` : "";
 
-    if (current.parent) {
-      // Nested view: fetch the parent by id with the link field's shape
-      // embedded — simpler and verified-working, vs. trying to make the
-      // *target* type the top-level SELECT subject via a reverse filter.
+    if (current.parent && !linkEditModeOn) {
+      // Nested view (not editing links): fetch the parent by id with the
+      // link field's shape embedded — simpler and verified-working, vs.
+      // trying to make the *target* type the top-level SELECT subject via a
+      // reverse filter.
       return {
         pyql: `select ${current.parent.parentType} { ${current.parent.fieldName}: { ${shape} }${filterClause}${orderClause} limit 500 } filter .id = <uuid>$parentId`,
         params: {parentId: current.parent.id},
         extractField: current.parent.fieldName,
       };
     }
+    // Root view, or a nested view in "Edit links" mode — either way we want
+    // every object of the target type as a normal top-level SELECT, so link
+    // candidates aren't limited to what's already linked.
     return {
       pyql: `SELECT ${current.pylonType} { ${shape} }${filterClause}${orderClause} offset 0 limit 500`,
       params: undefined,
       extractField: null as string | null,
     };
-  }, [pointers, sortField, sortDir, filterExpr, current]);
+  }, [pointers, sortField, sortDir, filterExpr, current, linkEditModeOn]);
 
   const dataQuery = useQuery({
-    queryKey: ["dataExplorer", "objects", current, sortField, sortDir, filterExpr],
+    queryKey: ["dataExplorer", "objects", current, sortField, sortDir, filterExpr, linkEditModeOn],
     queryFn: async () => {
       const res = await api.runQuery(query!.pyql, query!.params);
       if (!query!.extractField) return res.objects as Row[];
@@ -80,9 +98,10 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
     enabled: query !== null,
   });
 
-  // Nested views approximate the total count from the fetched objects (no
-  // separate count query — a deliberate v1 simplification, see the plan)
-  // ; root views get a real count via count().
+  // Nested views (not editing links) approximate the total count from the
+  // fetched objects (no separate count query — a deliberate v1
+  // simplification, see the plan); root views and edit-links mode (which is
+  // really just a root view of the target type) get a real count via count().
   const countQuery = useQuery({
     queryKey: ["dataExplorer", "count", current.pylonType, filterExpr],
     queryFn: async () => {
@@ -90,10 +109,38 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
       const res = await api.runQuery(`select count((select ${current.pylonType}${filterClause}))`);
       return res.objects[0] as number;
     },
-    enabled: !current.parent,
+    enabled: !current.parent || linkEditModeOn,
   });
 
-  const objectCount = current.parent ? (dataQuery.data?.length ?? null) : (countQuery.data ?? null);
+  // Which target ids are already linked on the server — only needed in
+  // "Edit links" mode, to seed each row's checkbox/radio starting state.
+  const linkedIdsQuery = useQuery({
+    queryKey: ["dataExplorer", "linkedIds", current.parent?.parentType, current.parent?.id, current.parent?.fieldName],
+    queryFn: async () => {
+      const parent = current.parent!;
+      const res = await api.runQuery(`select ${parent.parentType} { ${parent.fieldName}: {id} } filter .id = <uuid>$parentId`, {
+        parentId: parent.id,
+      });
+      const extracted = (res.objects[0] as Row | undefined)?.[parent.fieldName];
+      const items = (Array.isArray(extracted) ? extracted : extracted ? [extracted] : []) as Row[];
+      return new Set(items.map((item) => item.id as string));
+    },
+    enabled: !!current.parent && linkEditModeOn,
+  });
+
+  const linkEditMode: LinkEditMode | undefined =
+    current.parent && linkEditModeOn
+      ? {
+          parentId: current.parent.id,
+          parentObjectTypeName: current.parent.parentType,
+          pointerName: current.parent.fieldName,
+          linkTypeName: current.pylonType,
+          single: isSingleLink,
+          linkedIds: linkedIdsQuery.data ?? new Set(),
+        }
+      : undefined;
+
+  const objectCount = current.parent && !linkEditModeOn ? (dataQuery.data?.length ?? null) : (countQuery.data ?? null);
 
   const goBack = () => navigate(`${basePath}/${stackToPath(stack.slice(0, -1))}`);
 
@@ -158,6 +205,41 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
           )}
         </div>
 
+        {current.parent && parentPointer && parentPointer.kind !== "computed" && (
+          <button
+            type="button"
+            onClick={() => setLinkEditModeOn((o) => !o)}
+            className={clsx(
+              "flex h-7 items-center gap-1 rounded-md px-2 text-2sm",
+              linkEditModeOn ? "bg-surface-hover text-accent" : "text-fg-muted hover:bg-surface-hover"
+            )}
+          >
+            <Link2 size={12} strokeWidth={1.75} />
+            Edit links
+          </button>
+        )}
+
+        {(!current.parent || linkEditModeOn) && schema && schemaType && (
+          <InsertRowButton
+            schema={schema}
+            schemaType={schemaType}
+            onInsert={(concreteTypeName) =>
+              createNewRow(
+                concreteTypeName,
+                current.parent && linkEditModeOn
+                  ? {
+                      parentId: current.parent.id,
+                      parentObjectTypeName: current.parent.parentType,
+                      pointerName: current.parent.fieldName,
+                      linkTypeName: current.pylonType,
+                      single: isSingleLink,
+                    }
+                  : undefined
+              )
+            }
+          />
+        )}
+
         <button
           type="button"
           onClick={() => setFilterOpen((o) => !o)}
@@ -192,6 +274,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
           sortDir={sortField ? sortDir : null}
           onSort={toggleSort}
           onNavigateLink={navigateLink}
+          linkEditMode={linkEditMode}
         />
       ) : (
         <div className="flex flex-1 items-center justify-center text-sm text-fg-muted">
