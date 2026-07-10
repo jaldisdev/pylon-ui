@@ -4,7 +4,7 @@ import {Loader2} from "lucide-react";
 import {JsonTree} from "@/ui/JsonTree";
 
 export interface QueryResult {
-  rows: unknown[];
+  objects: unknown[];
   durationMs: number;
 }
 
@@ -44,10 +44,10 @@ export const ResultPanel: React.FC<ResultPanelProps> = ({isRunning, result, erro
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex-1 overflow-auto p-3">
-        <JsonTree value={result.rows} />
+        <JsonTree value={result.objects} />
       </div>
       <div className="flex h-7 shrink-0 select-none items-center justify-center bg-surface text-2xs text-fg-muted">
-        {result.rows.length} object{result.rows.length === 1 ? "" : "s"} · {result.durationMs.toFixed(1)}ms
+        {result.objects.length} object{result.objects.length === 1 ? "" : "s"} · {result.durationMs.toFixed(1)}ms
       </div>
     </div>
   );

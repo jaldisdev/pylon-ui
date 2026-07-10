@@ -18,7 +18,7 @@ export const ReplEntry: React.FC<ReplEntryProps> = ({entry}) => (
       <pre className="mt-1 whitespace-pre-wrap text-red-500">{entry.error}</pre>
     ) : (
       <>
-        <JsonTree value={entry.rows} className="mt-1" />
+        <JsonTree value={entry.objects} className="mt-1" />
         {entry.durationMs !== undefined && (
           <div className="mt-0.5 text-xs text-fg-muted">{entry.durationMs.toFixed(1)}ms</div>
         )}

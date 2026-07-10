@@ -94,7 +94,7 @@ export const QueryEditorTab: React.FC = () => {
       {pyql, paramsDict},
       {
         onSuccess: (data) => {
-          const result = {rows: data.rows, durationMs: data.duration_ms};
+          const result = {objects: data.objects, durationMs: data.duration_ms};
           setResult(result);
           setError(null);
           setLastRunQueryText(pyql);
@@ -105,7 +105,7 @@ export const QueryEditorTab: React.FC = () => {
                 id: crypto.randomUUID(),
                 pyql,
                 timestamp: Date.now(),
-                rowCount: data.rows.length,
+                objectCount: data.objects.length,
                 paramValues: {...paramValues},
                 result,
                 error: null,
@@ -126,7 +126,7 @@ export const QueryEditorTab: React.FC = () => {
                 id: crypto.randomUUID(),
                 pyql,
                 timestamp: Date.now(),
-                rowCount: null,
+                objectCount: null,
                 paramValues: {...paramValues},
                 result: null,
                 error: message,

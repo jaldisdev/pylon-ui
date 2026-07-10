@@ -13,7 +13,7 @@ import {ReplEntry} from "@/features/repl/ReplEntry";
 export interface HistoryEntry {
   id: number;
   pyql: string;
-  rows?: unknown[];
+  objects?: unknown[];
   durationMs?: number;
   error?: string;
 }
@@ -39,7 +39,7 @@ export const ReplTab: React.FC = () => {
       onSuccess: (data) => {
         setHistory((h) => [
           ...h,
-          {id: h.length, pyql, rows: data.rows, durationMs: data.duration_ms},
+          {id: h.length, pyql, objects: data.objects, durationMs: data.duration_ms},
         ]);
       },
       onError: (err) => {

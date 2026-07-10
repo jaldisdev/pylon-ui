@@ -6,12 +6,12 @@ export interface HistoryEntry {
   id: string;
   pyql: string;
   timestamp: number;
-  rowCount: number | null; // null means the run errored — shown in the list preview
+  objectCount: number | null; // null means the run errored — shown in the list preview
   // Cached so selecting a past entry restores the exact same state (params,
   // result, error) instantly, matching Gel — not just the query text, which
   // would otherwise need a re-run against a possibly-since-changed database.
   paramValues: Record<string, string>;
-  result: {rows: unknown[]; durationMs: number} | null;
+  result: {objects: unknown[]; durationMs: number} | null;
   error: string | null;
 }
 
@@ -56,12 +56,12 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({entries, open, onClos
               <div
                 className={clsx(
                   "mt-0.5 text-2xs",
-                  entry.rowCount === null ? "text-red-500" : "text-fg-muted"
+                  entry.objectCount === null ? "text-red-500" : "text-fg-muted"
                 )}
               >
-                {entry.rowCount === null
+                {entry.objectCount === null
                   ? "error"
-                  : `${entry.rowCount} object${entry.rowCount === 1 ? "" : "s"}`}
+                  : `${entry.objectCount} object${entry.objectCount === 1 ? "" : "s"}`}
                 {" · "}
                 {new Date(entry.timestamp).toLocaleTimeString()}
               </div>

@@ -68,19 +68,19 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
   }, [fields, sortField, sortDir, filterExpr, current]);
 
   const dataQuery = useQuery({
-    queryKey: ["dataExplorer", "rows", current, sortField, sortDir, filterExpr],
+    queryKey: ["dataExplorer", "objects", current, sortField, sortDir, filterExpr],
     queryFn: async () => {
       const res = await api.runQuery(query!.pyql, query!.params);
-      if (!query!.extractField) return res.rows as Row[];
+      if (!query!.extractField) return res.objects as Row[];
       // A single-link field (e.g. "company") extracts to one object or null,
       // not an array like a multi-link does — normalize both cases to Row[].
-      const extracted = (res.rows[0] as Row | undefined)?.[query!.extractField];
+      const extracted = (res.objects[0] as Row | undefined)?.[query!.extractField];
       return (Array.isArray(extracted) ? extracted : extracted ? [extracted] : []) as Row[];
     },
     enabled: query !== null,
   });
 
-  // Nested views approximate the total count from the fetched rows (no
+  // Nested views approximate the total count from the fetched objects (no
   // separate count query — a deliberate v1 simplification, see the plan)
   // ; root views get a real count via count().
   const countQuery = useQuery({
@@ -88,12 +88,12 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
     queryFn: async () => {
       const filterClause = filterExpr ? ` filter ${filterExpr}` : "";
       const res = await api.runQuery(`select count((select ${current.pylonType}${filterClause}))`);
-      return res.rows[0] as number;
+      return res.objects[0] as number;
     },
     enabled: !current.parent,
   });
 
-  const rowCount = current.parent ? (dataQuery.data?.length ?? null) : (countQuery.data ?? null);
+  const objectCount = current.parent ? (dataQuery.data?.length ?? null) : (countQuery.data ?? null);
 
   const goBack = () => navigate(`${basePath}/${stackToPath(stack.slice(0, -1))}`);
 
@@ -142,9 +142,9 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
         <div className="flex-1" />
 
         <div className="flex items-center gap-1.5 font-mono text-2sm text-fg-muted">
-          {rowCount !== null ? (
+          {objectCount !== null ? (
             <>
-              {rowCount} object{rowCount === 1 ? "" : "s"}
+              {objectCount} object{objectCount === 1 ? "" : "s"}
               <button
                 type="button"
                 onClick={() => dataQuery.refetch()}

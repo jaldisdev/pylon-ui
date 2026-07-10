@@ -32,7 +32,7 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
 };
 
 export interface QueryResponse {
-  rows: unknown[];
+  objects: unknown[];
   duration_ms: number;
 }
 
