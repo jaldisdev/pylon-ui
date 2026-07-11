@@ -1,5 +1,5 @@
 import type {SchemaPointer, SchemaResponse, SchemaType} from "@/lib/api/client";
-import type {DeleteObjectEdit, InsertObjectEdit, UpdateLinkEdit, UpdatePropertyEdit} from "./editsStore";
+import type {DeleteObjectEdit, EditValue, InsertObjectEdit, UpdateLinkEdit, UpdatePropertyEdit} from "./editsStore";
 
 // Ports gel-ui's generateStatements() (shared/studio/tabs/dataview/state/edits.ts)
 // to PyQL: groups pending edits by object, emits one insert/update/delete
@@ -79,35 +79,79 @@ const groupLinkEditsByObjectId = (linkEdits: Map<string, UpdateLinkEdit>): Map<s
 // to merge with); a single-link always does too (it can only ever reference
 // one target). Returns null when there's nothing left to write (e.g. every
 // pending Add target was also in this batch's deleteEdits).
+//
+// A through-typed multi-link can carry per-target junction properties
+// (`@prop := <type>$pN`, e.g. Product.tags's ProductTag.weight — see
+// pylon-core's link-property write support). Since a shape attaches to one
+// target-selecting expression and applies uniformly to every row it yields,
+// a target with its own property values can't be folded into the shared
+// `.id = $a or .id = $b` batch — it gets its own individually-shaped
+// `(select Type filter .id = $x) { @prop := $v }`, combined with any batched
+// (property-less) adds via `union`.
 const buildLinkExpr = (
   edit: UpdateLinkEdit,
   pointer: SchemaPointer,
   isInsert: boolean,
   insertVarNames: Map<number, string>,
   deletedIds: Set<string>,
-  alloc: ParamAllocator
-): {op: ":=" | "+=" | "-="; expr: string} | null => {
+  alloc: ParamAllocator,
+  schema: SchemaResponse
+): {op: ":=" | "+=" | "-="; expr: string; error?: string} | null => {
   const targetType = edit.linkTypeName;
   const isMulti = pointer.kind === "multiLink";
 
   if (edit.setNull) return {op: ":=", expr: `${targetType}{}`};
 
-  const addConds: string[] = [];
+  const throughPointers =
+    isMulti && pointer.through ? findType(schema, pointer.through)?.pointers.filter((p) => p.name !== "id") : undefined;
+
+  let error: string | undefined;
+
+  // ` { @prop := <type>$pN, ... }` for one target's junction property
+  // values, or "" if there's nothing to write. Flags a missing required
+  // (no-default) property the same way a regular insert does.
+  const shapeFor = (properties: Record<string, EditValue> | undefined): string => {
+    if (!throughPointers) return "";
+    const assignments: string[] = [];
+    for (const tp of throughPointers) {
+      const value = properties?.[tp.name];
+      if (value === undefined) {
+        if (tp.required && !tp.hasDefault) error = `missing required link property '${tp.name}'`;
+        continue;
+      }
+      if (!value.valid) {
+        error = `invalid value for link property '${tp.name}': ${value.error}`;
+        continue;
+      }
+      assignments.push(`@${tp.name} := <${castTypeFor(tp)}>$${alloc.add(value.value)}`);
+    }
+    return assignments.length > 0 ? ` { ${assignments.join(", ")} }` : "";
+  };
+
+  const batchAddConds: string[] = []; // adds with no properties -> batched OR (common case)
+  const shapedAddParts: string[] = []; // adds with properties -> individually-shaped selects
   const removeIds: string[] = [];
   for (const change of edit.changes.values()) {
     if (change.kind === "add") {
       if (deletedIds.has(change.id)) continue; // can't link to something also being deleted this batch
-      addConds.push(`.id = <uuid>$${alloc.add(change.id)}`);
+      if (throughPointers && change.properties && Object.keys(change.properties).length > 0) {
+        const idParam = alloc.add(change.id);
+        shapedAddParts.push(`(select ${targetType} filter .id = <uuid>$${idParam})${shapeFor(change.properties)}`);
+      } else {
+        batchAddConds.push(`.id = <uuid>$${alloc.add(change.id)}`);
+      }
     } else {
       removeIds.push(change.id);
     }
   }
 
   const addExprParts: string[] = [];
-  if (addConds.length > 0) addExprParts.push(`(select ${targetType} filter ${addConds.join(" or ")})`);
+  if (batchAddConds.length > 0) addExprParts.push(`(select ${targetType} filter ${batchAddConds.join(" or ")})`);
+  addExprParts.push(...shapedAddParts);
   for (const tempId of edit.inserts) {
     const varName = insertVarNames.get(tempId);
-    if (varName) addExprParts.push(`(select ${varName})`);
+    if (!varName) continue;
+    addExprParts.push(`(select ${varName})${shapeFor(edit.insertProperties.get(tempId))}`);
   }
 
   const hasAdds = addExprParts.length > 0;
@@ -116,23 +160,26 @@ const buildLinkExpr = (
 
   if (!isMulti || isInsert) {
     // Single-link, or any insert's own link field: always a full replace.
-    return {op: ":=", expr: addExprParts[0] ?? `${targetType}{}`};
+    return {op: ":=", expr: addExprParts[0] ?? `${targetType}{}`, error};
   }
 
-  if (hasAdds && !hasRemoves) return {op: "+=", expr: addExprParts.join(" union ")};
+  if (hasAdds && !hasRemoves) return {op: "+=", expr: addExprParts.join(" union "), error};
 
   if (hasRemoves && !hasAdds) {
     const removeConds = removeIds.map((id) => `.id = <uuid>$${alloc.add(id)}`).join(" or ");
-    return {op: "-=", expr: `(select ${targetType} filter ${removeConds})`};
+    return {op: "-=", expr: `(select ${targetType} filter ${removeConds})`, error};
   }
 
   // Mixed add + remove on an existing multi-link: `+=`/`-=` can't express
   // both in one operation, so recompute the full set — current membership
   // (via the update's own implicit `.pointerName` scope) minus removed,
-  // union added/forward-referenced.
+  // union added/forward-referenced. NOTE: `except` is not actually supported
+  // as a general expression operator by pylon-core today (confirmed by
+  // direct compile test) — this branch is a known pre-existing gap, not
+  // something this change addresses.
   const removeConds = removeIds.map((id) => `.id = <uuid>$${alloc.add(id)}`).join(" or ");
   const kept = `(.${edit.pointerName} except (select ${targetType} filter ${removeConds}))`;
-  return {op: ":=", expr: [kept, ...addExprParts].join(" union ")};
+  return {op: ":=", expr: [kept, ...addExprParts].join(" union "), error};
 };
 
 const insertDependencies = (insertId: number, linkEditsByObjectId: Map<string | number, UpdateLinkEdit[]>): number[] => {
@@ -210,8 +257,11 @@ const buildInsertStatement = (
         }
         continue;
       }
-      const built = buildLinkExpr(edit, pointer, true, insertVarNames, deletedIds, alloc);
-      if (built) lines.push(`${pointer.name} ${built.op} ${built.expr}`);
+      const built = buildLinkExpr(edit, pointer, true, insertVarNames, deletedIds, alloc, schema);
+      if (built) {
+        if (built.error) error = built.error;
+        lines.push(`${pointer.name} ${built.op} ${built.expr}`);
+      }
     }
   }
 
@@ -261,8 +311,11 @@ const buildUpdateStatements = (
     for (const edit of linkEditsByObjectId.get(objectId) ?? []) {
       const pointer = type?.pointers.find((p) => p.name === edit.pointerName);
       if (!pointer) continue;
-      const built = buildLinkExpr(edit, pointer, false, insertVarNames, deletedIds, alloc);
-      if (built) lines.push(`${edit.pointerName} ${built.op} ${built.expr}`);
+      const built = buildLinkExpr(edit, pointer, false, insertVarNames, deletedIds, alloc, schema);
+      if (built) {
+        if (built.error) error = built.error;
+        lines.push(`${edit.pointerName} ${built.op} ${built.expr}`);
+      }
     }
 
     const idParam = alloc.add(objectId);

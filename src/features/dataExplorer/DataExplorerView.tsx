@@ -57,6 +57,12 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
   const parentSchemaType = schema?.types.find((t) => `${t.module}::${t.name}` === current.parent?.parentType);
   const parentPointer = parentSchemaType?.pointers.find((p) => p.name === current.parent?.fieldName);
   const isSingleLink = parentPointer?.kind === "link";
+  // The junction (through-type)'s own properties (e.g. ProductTag.weight),
+  // if any — powers the inline per-row property inputs in "Edit links" mode.
+  const throughType = parentPointer?.through
+    ? schema?.types.find((t) => `${t.module}::${t.name}` === parentPointer.through)
+    : undefined;
+  const throughPointers = throughType?.pointers.filter((p) => p.name !== "id");
 
   const query = useMemo(() => {
     if (pointers.length === 0) return null;
@@ -137,6 +143,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
           linkTypeName: current.pylonType,
           single: isSingleLink,
           linkedIds: linkedIdsQuery.data ?? new Set(),
+          throughPointers: throughPointers && throughPointers.length > 0 ? throughPointers : undefined,
         }
       : undefined;
 

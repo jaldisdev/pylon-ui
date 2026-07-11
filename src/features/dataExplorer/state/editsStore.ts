@@ -37,6 +37,10 @@ export interface LinkChange {
   kind: LinkChangeKind;
   id: string;
   typename: string;
+  // Junction (through-type) property values for this target — only
+  // meaningful for kind "add" on a through-typed multi-link. Keyed by the
+  // through-type's own pointer name (e.g. "weight").
+  properties?: Record<string, EditValue>;
 }
 
 export interface UpdateLinkEdit {
@@ -47,6 +51,10 @@ export interface UpdateLinkEdit {
   setNull: boolean;
   changes: Map<string, LinkChange>; // keyed by target object id
   inserts: Set<number>; // temp ids of same-batch pending inserts linked here
+  // Junction property values for same-batch pending-insert targets, keyed by
+  // temp id — parallels `changes`' per-LinkChange `properties` (a Set has no
+  // place to attach them directly).
+  insertProperties: Map<number, Record<string, EditValue>>;
 }
 
 export interface InsertObjectEdit {
@@ -109,6 +117,20 @@ interface DataEditsState {
     tempId: number,
     single: boolean
   ) => void;
+  // Set one junction (through-type) property value for a checked link
+  // target — `targetId` is either a real target uuid (an existing-object
+  // add, tracked in `changes`) or a same-batch pending insert's temp id
+  // (tracked in `insertProperties`). No-op if the target isn't currently an
+  // "add" (e.g. unchecked, or a plain "remove").
+  setLinkTargetProperty: (
+    objectId: string | number,
+    objectTypeName: string,
+    pointerName: string,
+    linkTypeName: string,
+    targetId: string | number,
+    propName: string,
+    value: EditValue
+  ) => void;
 
   clearAllPendingEdits: () => void;
 }
@@ -128,6 +150,7 @@ const emptyLinkEdit = (
   setNull: false,
   changes: new Map(),
   inserts: new Set(),
+  insertProperties: new Map(),
 });
 
 // Temp ids for not-yet-saved inserted objects — negative and decreasing so
@@ -306,6 +329,39 @@ export const useDataEditsStore = create<DataEditsState>()((set, get) => ({
         inserts.add(tempId);
       }
       linkEdits.set(key, {...existing, setNull: false, changes, inserts});
+      return {linkEdits};
+    });
+  },
+
+  setLinkTargetProperty: (objectId, objectTypeName, pointerName, linkTypeName, targetId, propName, value) => {
+    set((s) => {
+      const linkEdits = new Map(s.linkEdits);
+      const key = editKey(objectId, pointerName);
+      const existing = linkEdits.get(key) ?? emptyLinkEdit(objectId, objectTypeName, pointerName, linkTypeName);
+
+      if (typeof targetId === "number") {
+        if (!existing.inserts.has(targetId)) return {}; // not a checked target — no-op
+        const insertProperties = new Map(existing.insertProperties);
+        insertProperties.set(targetId, {...insertProperties.get(targetId), [propName]: value});
+        linkEdits.set(key, {...existing, insertProperties});
+        return {linkEdits};
+      }
+
+      const change = existing.changes.get(targetId);
+      if (change?.kind === "remove") return {}; // explicitly being unlinked — no-op
+      const changes = new Map(existing.changes);
+      // No explicit "add" yet means this target is already linked on the
+      // server and just hasn't been toggled — editing its property value is
+      // still a meaningful pending edit (re-affirms the link so the
+      // generated `+=` reaches the compiler's ON CONFLICT DO UPDATE upsert,
+      // rather than being silently dropped).
+      changes.set(targetId, {
+        kind: "add",
+        id: targetId,
+        typename: linkTypeName,
+        properties: {...change?.properties, [propName]: value},
+      });
+      linkEdits.set(key, {...existing, changes});
       return {linkEdits};
     });
   },

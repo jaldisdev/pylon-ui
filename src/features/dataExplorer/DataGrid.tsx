@@ -9,7 +9,8 @@ import type {SchemaPointer, SchemaResponse} from "@/lib/api/client";
 import {lookupPointerTypeTag} from "@/lib/schema/typeTags";
 import {ScalarValue} from "@/ui/ScalarValue";
 import {DataEditorCell} from "@/ui/dataEditor/DataEditorCell";
-import {useDataEditsStore} from "@/features/dataExplorer/state/editsStore";
+import {LinkPropertyCell} from "@/ui/dataEditor/LinkPropertyCell";
+import {useDataEditsStore, type EditValue} from "@/features/dataExplorer/state/editsStore";
 
 export type SortDir = "ASC" | "DESC";
 type Row = Record<string, unknown>;
@@ -31,6 +32,10 @@ export interface LinkEditMode {
   linkTypeName: string;
   single: boolean;
   linkedIds: Set<string>;
+  // The junction (through-type)'s own properties (e.g. ProductTag.weight),
+  // excluding "id" — undefined/empty when the multi-link has no through
+  // type, or the through type declares no properties beyond id.
+  throughPointers?: SchemaPointer[];
 }
 
 interface DataGridProps {
@@ -100,6 +105,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const addLinkUpdate = useDataEditsStore((s) => s.addLinkUpdate);
   const removeLinkUpdate = useDataEditsStore((s) => s.removeLinkUpdate);
   const toggleLinkInsert = useDataEditsStore((s) => s.toggleLinkInsert);
+  const setLinkTargetProperty = useDataEditsStore((s) => s.setLinkTargetProperty);
 
   const displayRows = useMemo<DisplayRow[]>(() => {
     const pendingInserts = Array.from(insertEdits.values()).filter((ins) => ins.objectTypeName === pylonType);
@@ -141,6 +147,12 @@ export const DataGrid: React.FC<DataGridProps> = ({
               <th className="sticky left-0 z-20 w-10 border-b border-border bg-header px-2 py-1.5 text-fg-muted">
                 <Menu size={12} strokeWidth={1.75} />
               </th>
+              {linkEditMode?.throughPointers?.map((tp) => (
+                <th key={`@${tp.name}`} className="w-28 border-b border-border px-2 py-1.5 text-left font-mono whitespace-nowrap">
+                  <div className="truncate font-[450] text-2sm text-fg">@{tp.name}</div>
+                  {tp.typeName && <div className="truncate text-2xs font-normal text-fg-muted">{tp.typeName}</div>}
+                </th>
+              ))}
               {headerGroup.headers.map((header) => {
                 const pointer = pointers.find((p) => p.name === header.id)!;
                 const sortable = isSortable(pointer);
@@ -196,14 +208,17 @@ export const DataGrid: React.FC<DataGridProps> = ({
             const isDeletedRow = !isInsertRow && deleteEdits.has(objectId as string);
 
             let linkChecked = false;
+            let linkProperties: Record<string, EditValue> | undefined;
             if (linkEditMode) {
               const parentKey = `${linkEditMode.parentId}__${linkEditMode.pointerName}`;
               const parentEdit = linkEdits.get(parentKey);
               if (isInsertRow) {
                 linkChecked = parentEdit?.inserts.has(objectId as number) ?? false;
+                linkProperties = parentEdit?.insertProperties.get(objectId as number);
               } else {
                 const change = parentEdit?.changes.get(objectId as string);
                 linkChecked = change ? change.kind === "add" : linkEditMode.linkedIds.has(objectId as string);
+                linkProperties = change?.properties;
               }
             }
 
@@ -245,6 +260,20 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     onToggleLink={onToggleLink}
                   />
                 </td>
+                {linkEditMode?.throughPointers?.map((tp) => (
+                  <td key={`@${tp.name}`} className="border-b border-border px-2 py-1.5">
+                    <LinkPropertyCell
+                      pointer={tp}
+                      schema={schema!}
+                      value={linkProperties?.[tp.name]}
+                      disabled={!linkChecked}
+                      onChange={(value) => {
+                        const {parentId, parentObjectTypeName, pointerName, linkTypeName} = linkEditMode;
+                        setLinkTargetProperty(parentId, parentObjectTypeName, pointerName, linkTypeName, objectId, tp.name, value);
+                      }}
+                    />
+                  </td>
+                ))}
                 {pointers.map((pointer) => {
                   const isLink = pointer.kind === "link" || pointer.kind === "multiLink";
                   const cellEditable = isEditableCell(pointer, isInsertRow);
@@ -359,7 +388,7 @@ const GutterCell: React.FC<GutterCellProps> = ({
   if (isInsertRow) {
     return (
       <button type="button" onClick={onToggleDelete} title="Remove" className="flex h-full w-full items-center justify-end text-fg-muted hover:text-red-500">
-        <Trash2 size={12} strokeWidth={1.75} />
+        <Trash2 size={16} strokeWidth={1.75} />
       </button>
     );
   }
@@ -378,7 +407,7 @@ const GutterCell: React.FC<GutterCellProps> = ({
       className="group/gutter flex h-full w-full items-center justify-end text-fg-muted hover:text-red-500"
     >
       <span className="group-hover/gutter:hidden">{rowIndex + 1}</span>
-      <Trash2 size={12} strokeWidth={1.75} className="hidden group-hover/gutter:block" />
+      <Trash2 size={16} strokeWidth={1.75} className="hidden group-hover/gutter:block" />
     </button>
   );
 };
