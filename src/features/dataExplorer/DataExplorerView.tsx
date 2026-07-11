@@ -20,6 +20,8 @@ type Row = Record<string, unknown>;
 interface DataExplorerViewProps {
   stack: StackEntry[];
   basePath: string; // e.g. "/main/data"
+  hasPendingEdits: boolean;
+  onOpenReview: () => void;
 }
 
 // Builds the shape fragment for a SELECT — links/multi-links are
@@ -32,7 +34,7 @@ const buildShape = (pointers: {name: string; kind: string}[]) =>
 // row count/refresh, filter toggle, and the grid itself. Re-mounted (see the
 // `key` on DataExplorerTab's usage) whenever the view identity changes, so
 // sort/filter state resets between levels instead of needing manual resets.
-export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePath}) => {
+export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePath, hasPendingEdits, onOpenReview}) => {
   const navigate = useNavigate();
   const {data: schema} = useSchema();
   const {resolvedTheme} = useTheme();
@@ -171,31 +173,33 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
   return (
     <>
       <div className="flex h-11 shrink-0 items-center gap-2 bg-header border-b border-border px-2">
-        {current.parent ? (
-          <>
-            <button
-              type="button"
-              onClick={goBack}
-              className="flex h-7 w-7 items-center justify-center rounded text-fg-muted hover:bg-surface-hover hover:text-fg"
-            >
-              <ArrowLeft size={16} strokeWidth={1.75} />
-            </button>
-            <div className="font-mono text-sm">
-              <div className="text-fg-muted">{current.parent.parentType}</div>
-              <div className="text-2xs text-fg-muted/70">.{current.parent.fieldName}</div>
-            </div>
-          </>
-        ) : schema ? (
-          <ObjectTypeSelect
-            types={schema.types}
-            selected={schemaType ?? null}
-            onSelect={(type) => navigate(`${basePath}/${type.module}::${type.name}`)}
-          />
-        ) : null}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          {current.parent ? (
+            <>
+              <button
+                type="button"
+                onClick={goBack}
+                className="flex h-7 w-7 items-center justify-center rounded text-fg-muted hover:bg-surface-hover hover:text-fg"
+              >
+                <ArrowLeft size={16} strokeWidth={1.75} />
+              </button>
+              <div className="font-mono text-sm">
+                <div className="text-fg-muted">{current.parent.parentType}</div>
+                <div className="text-2xs text-fg-muted/70">.{current.parent.fieldName}</div>
+              </div>
+            </>
+          ) : schema ? (
+            <ObjectTypeSelect
+              types={schema.types}
+              selected={schemaType ?? null}
+              onSelect={(type) => navigate(`${basePath}/${type.module}::${type.name}`)}
+            />
+          ) : null}
+        </div>
 
-        <div className="flex-1" />
-
-        <div className="flex items-center gap-1.5 font-mono text-2sm text-fg-muted">
+        {/* Flanked by two flex-1 siblings so it sits at the true center of
+            the bar regardless of how wide the left/right groups are. */}
+        <div className="flex shrink-0 items-center gap-1.5 font-mono text-2sm text-fg-muted">
           {objectCount !== null ? (
             <>
               {objectCount} object{objectCount === 1 ? "" : "s"}
@@ -212,52 +216,64 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
           )}
         </div>
 
-        {current.parent && parentPointer && parentPointer.kind !== "computed" && (
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+          {current.parent && parentPointer && parentPointer.kind !== "computed" && (
+            <button
+              type="button"
+              onClick={() => setLinkEditModeOn((o) => !o)}
+              className={clsx(
+                "flex h-7 items-center gap-1 rounded-md px-2 text-2sm",
+                linkEditModeOn ? "bg-surface-hover text-accent" : "text-fg-muted hover:bg-surface-hover"
+              )}
+            >
+              <Link2 size={12} strokeWidth={1.75} />
+              Edit links
+            </button>
+          )}
+
+          {hasPendingEdits && (
+            <button
+              type="button"
+              onClick={onOpenReview}
+              className="rounded-md bg-orange-500 px-3 py-1 text-2sm font-medium text-white transition duration-300 hover:opacity-90 dark:bg-orange-600"
+            >
+              Review Changes
+            </button>
+          )}
+
+          {(!current.parent || linkEditModeOn) && schema && schemaType && (
+            <InsertRowButton
+              schema={schema}
+              schemaType={schemaType}
+              onInsert={(concreteTypeName) =>
+                createNewRow(
+                  concreteTypeName,
+                  current.parent && linkEditModeOn
+                    ? {
+                        parentId: current.parent.id,
+                        parentObjectTypeName: current.parent.parentType,
+                        pointerName: current.parent.fieldName,
+                        linkTypeName: current.pylonType,
+                        single: isSingleLink,
+                      }
+                    : undefined
+                )
+              }
+            />
+          )}
+
           <button
             type="button"
-            onClick={() => setLinkEditModeOn((o) => !o)}
+            onClick={() => setFilterOpen((o) => !o)}
             className={clsx(
               "flex h-7 items-center gap-1 rounded-md px-2 text-2sm",
-              linkEditModeOn ? "bg-surface-hover text-accent" : "text-fg-muted hover:bg-surface-hover"
+              filterOpen || filterExpr ? "bg-surface-hover text-accent" : "text-fg-muted hover:bg-surface-hover"
             )}
           >
-            <Link2 size={12} strokeWidth={1.75} />
-            Edit links
+            <Filter size={12} strokeWidth={1.75} />
+            Filter
           </button>
-        )}
-
-        {(!current.parent || linkEditModeOn) && schema && schemaType && (
-          <InsertRowButton
-            schema={schema}
-            schemaType={schemaType}
-            onInsert={(concreteTypeName) =>
-              createNewRow(
-                concreteTypeName,
-                current.parent && linkEditModeOn
-                  ? {
-                      parentId: current.parent.id,
-                      parentObjectTypeName: current.parent.parentType,
-                      pointerName: current.parent.fieldName,
-                      linkTypeName: current.pylonType,
-                      single: isSingleLink,
-                    }
-                  : undefined
-              )
-            }
-          />
-        )}
-
-        <button
-          type="button"
-          onClick={() => setFilterOpen((o) => !o)}
-          className={clsx(
-            "flex h-7 items-center gap-1 rounded-md px-2 text-2sm",
-            filterOpen || filterExpr ? "bg-surface-hover text-accent" : "text-fg-muted hover:bg-surface-hover"
-          )}
-        >
-          <Filter size={12} strokeWidth={1.75} />
-          Filter
-        </button>
+        </div>
       </div>
 
       {filterOpen && (

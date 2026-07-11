@@ -55,23 +55,19 @@ export const DataExplorerTab: React.FC = () => {
         <div className="mx-2 h-2 shrink-0 rounded-t-xl bg-surface-hover border-1 border-b-0 border-black/2.5 dark:border-white/2.5" />
       )}
       <Card className="flex-1">
-        {/* Lives above DataExplorerView's per-navigation remount boundary —
-            pending edits (and this trigger) must survive drilling into a
-            link and back, since they're tracked in a module-level store, not
-            component state. Only renders at all once there's something
-            pending, matching gel-ui exactly (not just enabled/disabled). */}
-        {hasPendingEdits && (
-          <div className="flex h-9 shrink-0 items-center justify-end border-b border-border bg-header px-2">
-            <button
-              type="button"
-              onClick={() => setReviewOpen(true)}
-              className="rounded-md bg-success px-3 py-1 text-2sm font-medium text-success-fg transition duration-300 hover:opacity-90"
-            >
-              Review Changes
-            </button>
-          </div>
-        )}
-        <DataExplorerView key={stackToPath(stack)} stack={stack} basePath={basePath} />
+        {/* hasPendingEdits/reviewOpen live here, above DataExplorerView's
+            per-navigation remount boundary — pending edits must survive
+            drilling into a link and back, since they're tracked in a
+            module-level store, not component state. The button itself
+            renders inside DataExplorerView's own toolbar (not a separate bar
+            above it) so it doesn't reflow the grid when it appears/disappears. */}
+        <DataExplorerView
+          key={stackToPath(stack)}
+          stack={stack}
+          basePath={basePath}
+          hasPendingEdits={hasPendingEdits}
+          onOpenReview={() => setReviewOpen(true)}
+        />
       </Card>
       {reviewOpen && <ReviewEditsModal onClose={() => setReviewOpen(false)} />}
     </div>
