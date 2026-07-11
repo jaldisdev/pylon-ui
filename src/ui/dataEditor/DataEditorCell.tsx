@@ -1,7 +1,6 @@
 import type React from "react";
 import {useEffect, useRef, useState} from "react";
 import clsx from "clsx";
-import {X} from "lucide-react";
 
 import type {SchemaPointer, SchemaResponse} from "@/lib/api/client";
 import {coerceParamValue, validateCastValue} from "@/lib/editor/lang-pyql/extractParams";
@@ -42,40 +41,45 @@ const toEditValue = (raw: string, castType: string | null): EditValue => {
   return error ? {valid: false, raw, error} : {valid: true, value: coerceParamValue(raw, castType)};
 };
 
-export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, initialValue, onCommit, onDiscard}) => (
-  <div
-    className="flex items-center gap-1"
-    onKeyDown={(e) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        onDiscard();
-      }
-    }}
-  >
-    <div className="min-w-0 flex-1">
-      {pointer.kind === "enum" ? (
-        <EnumEditor pointer={pointer} schema={schema} initialValue={initialValue} onCommit={onCommit} onDiscard={onDiscard} />
-      ) : pointer.typeName === "std::bool" ? (
-        <BoolEditor initialValue={initialValue} onCommit={onCommit} />
-      ) : (
-        <TextEditor pointer={pointer} initialValue={initialValue} onCommit={onCommit} />
+export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, initialValue, onCommit, onDiscard}) => {
+  const optional = !pointer.required;
+  return (
+    <div
+      className="flex items-stretch"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          onDiscard();
+        }
+      }}
+    >
+      <div className="min-w-0 flex-1">
+        {pointer.kind === "enum" ? (
+          <EnumEditor pointer={pointer} schema={schema} initialValue={initialValue} onCommit={onCommit} onDiscard={onDiscard} />
+        ) : pointer.typeName === "std::bool" ? (
+          <BoolEditor initialValue={initialValue} onCommit={onCommit} />
+        ) : (
+          <TextEditor pointer={pointer} initialValue={initialValue} onCommit={onCommit} squareRight={optional} />
+        )}
+      </div>
+      {/* Optional pointers get an explicit "clear to {}" action, matching
+          gel-ui's tan pill button butted against the input's right edge —
+          the only way to blank an optional value rather than typing
+          something. Immediately commits (no separate "empty mode"),
+          matching gel-ui's onClose(false)-on-click behavior. */}
+      {optional && (
+        <button
+          type="button"
+          title="Set to {}"
+          onClick={() => onCommit({valid: true, value: null})}
+          className="flex shrink-0 items-center justify-center rounded-r-md bg-orange-500 px-2 font-mono text-2sm font-medium text-white hover:opacity-90 dark:bg-orange-600"
+        >
+          {"{}"}
+        </button>
       )}
     </div>
-    {/* Optional pointers get an explicit "clear to {}" action, matching
-        gel-ui's nullable-input wrapping — the only way to blank an optional
-        value rather than typing something. */}
-    {!pointer.required && (
-      <button
-        type="button"
-        title="Set to {}"
-        onClick={() => onCommit({valid: true, value: null})}
-        className="shrink-0 text-fg-muted hover:text-fg"
-      >
-        <X size={12} strokeWidth={1.75} />
-      </button>
-    )}
-  </div>
-);
+  );
+};
 
 const EnumEditor: React.FC<{
   pointer: SchemaPointer;
@@ -139,11 +143,12 @@ const BoolEditor: React.FC<{initialValue: unknown; onCommit: (value: EditValue) 
   );
 };
 
-const TextEditor: React.FC<{pointer: SchemaPointer; initialValue: unknown; onCommit: (value: EditValue) => void}> = ({
-  pointer,
-  initialValue,
-  onCommit,
-}) => {
+const TextEditor: React.FC<{
+  pointer: SchemaPointer;
+  initialValue: unknown;
+  onCommit: (value: EditValue) => void;
+  squareRight?: boolean;
+}> = ({pointer, initialValue, onCommit, squareRight}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [raw, setRaw] = useState(() => valueToRawText(initialValue));
   const rawRef = useRef(raw);
@@ -178,12 +183,13 @@ const TextEditor: React.FC<{pointer: SchemaPointer; initialValue: unknown; onCom
   };
 
   const inputClassName = clsx(
-    "w-full rounded border bg-surface px-1.5 py-1 font-mono text-2sm",
+    "h-full w-full rounded bg-surface px-1.5 py-1 font-mono text-2sm outline-none",
+    squareRight ? "rounded-r-none border border-r-0" : "border",
     error ? "border-red-500" : "border-border focus:border-accent"
   );
 
   return (
-    <div ref={containerRef}>
+    <div ref={containerRef} className="h-full">
       {isMultiline ? (
         <textarea
           autoFocus
