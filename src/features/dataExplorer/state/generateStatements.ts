@@ -96,11 +96,11 @@ const buildLinkExpr = (
   deletedIds: Set<string>,
   alloc: ParamAllocator,
   schema: SchemaResponse
-): {op: ":=" | "+=" | "-="; expr: string; error?: string} | null => {
+): {parts: {op: ":=" | "+=" | "-="; expr: string}[]; error?: string} | null => {
   const targetType = edit.linkTypeName;
   const isMulti = pointer.kind === "multiLink";
 
-  if (edit.setNull) return {op: ":=", expr: `${targetType}{}`};
+  if (edit.setNull) return {parts: [{op: ":=", expr: `${targetType}{}`}]};
 
   const throughPointers =
     isMulti && pointer.through ? findType(schema, pointer.through)?.pointers.filter((p) => p.name !== "id") : undefined;
@@ -160,26 +160,32 @@ const buildLinkExpr = (
 
   if (!isMulti || isInsert) {
     // Single-link, or any insert's own link field: always a full replace.
-    return {op: ":=", expr: addExprParts[0] ?? `${targetType}{}`, error};
+    return {parts: [{op: ":=", expr: addExprParts[0] ?? `${targetType}{}`}], error};
   }
 
-  if (hasAdds && !hasRemoves) return {op: "+=", expr: addExprParts.join(" union "), error};
+  if (hasAdds && !hasRemoves) return {parts: [{op: "+=", expr: addExprParts.join(" union ")}], error};
 
   if (hasRemoves && !hasAdds) {
     const removeConds = removeIds.map((id) => `.id = <uuid>$${alloc.add(id)}`).join(" or ");
-    return {op: "-=", expr: `(select ${targetType} filter ${removeConds})`, error};
+    return {parts: [{op: "-=", expr: `(select ${targetType} filter ${removeConds})`}], error};
   }
 
-  // Mixed add + remove on an existing multi-link: `+=`/`-=` can't express
-  // both in one operation, so recompute the full set — current membership
-  // (via the update's own implicit `.pointerName` scope) minus removed,
-  // union added/forward-referenced. NOTE: `except` is not actually supported
-  // as a general expression operator by pylon-core today (confirmed by
-  // direct compile test) — this branch is a known pre-existing gap, not
-  // something this change addresses.
+  // Mixed add + remove on an existing multi-link: two independent shape
+  // elements for the *same* pointer in one SET clause — `tags += (...)` and
+  // `tags -= (...)` — rather than one `:=` recomputing the full set via
+  // `except` (confirmed directly against the compiler: `except` isn't
+  // supported as a general expression operator, but two shape elements for
+  // one pointer in the same SET clause compiles and executes correctly,
+  // since each becomes its own independent junction CTE sharing the same
+  // row source).
   const removeConds = removeIds.map((id) => `.id = <uuid>$${alloc.add(id)}`).join(" or ");
-  const kept = `(.${edit.pointerName} except (select ${targetType} filter ${removeConds}))`;
-  return {op: ":=", expr: [kept, ...addExprParts].join(" union "), error};
+  return {
+    parts: [
+      {op: "+=", expr: addExprParts.join(" union ")},
+      {op: "-=", expr: `(select ${targetType} filter ${removeConds})`},
+    ],
+    error,
+  };
 };
 
 const insertDependencies = (insertId: number, linkEditsByObjectId: Map<string | number, UpdateLinkEdit[]>): number[] => {
@@ -260,7 +266,7 @@ const buildInsertStatement = (
       const built = buildLinkExpr(edit, pointer, true, insertVarNames, deletedIds, alloc, schema);
       if (built) {
         if (built.error) error = built.error;
-        lines.push(`${pointer.name} ${built.op} ${built.expr}`);
+        for (const part of built.parts) lines.push(`${pointer.name} ${part.op} ${part.expr}`);
       }
     }
   }
@@ -314,7 +320,7 @@ const buildUpdateStatements = (
       const built = buildLinkExpr(edit, pointer, false, insertVarNames, deletedIds, alloc, schema);
       if (built) {
         if (built.error) error = built.error;
-        lines.push(`${edit.pointerName} ${built.op} ${built.expr}`);
+        for (const part of built.parts) lines.push(`${edit.pointerName} ${part.op} ${part.expr}`);
       }
     }
 
