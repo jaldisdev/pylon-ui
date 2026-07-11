@@ -87,11 +87,11 @@ export interface AiChatRequest {
   pylonType: string;
   indexName: string | null;
   // Optional PyQL expression narrowing which objects vector::search's first
-  // argument scopes over, e.g. "select Type filter .field = value" — null
+  // argument scopes over, e.g. "select Type filter .property = value" — null
   // (or empty) searches every object of pylonType instead.
   contextQuery: string | null;
   // Both the vector::search query text *and* the LLM's question — no
-  // separate search-text field.
+  // separate search-text input.
   message: string;
   history: AiChatMessage[];
 }
@@ -106,11 +106,21 @@ export interface AiChatResponse {
   results: AiChatResult[];
 }
 
+export interface StatsResponse {
+  // Live-tuple estimate from Postgres's own stats (pg_stat_user_tables), not
+  // an exact count — matches Gel's own dashboard tradeoff.
+  objects: number;
+  // Every registered schema type (concrete, abstract, interface, junction)
+  // plus registered custom scalars.
+  types: number;
+}
+
 export const api = {
   getSchema: () => request<SchemaResponse>("/schema"),
   getConnections: () => request<ConnectionsResponse>("/connections"),
   getModels: () => request<ModelsResponse>("/models"),
   getGlobals: () => request<GlobalsResponse>("/globals"),
+  getStats: () => request<StatsResponse>("/stats"),
   runQuery: (pyql: string, params?: Record<string, unknown>, signal?: AbortSignal) =>
     request<QueryResponse>("/query", {
       method: "POST",
@@ -158,10 +168,10 @@ export interface VectorIndexInfo {
   // null for a bare/default VectorIndex (not assigned to a named attribute).
   indexName: string | null;
   model: string;
-  // Fields the index was declared with (what actually got embedded) — the
+  // Pointers the index was declared with (what actually got embedded) — the
   // AI tab's Index select shows these, and /api/ai/chat uses them server-side
-  // to build its context, so the frontend never needs to pass fields itself.
-  fields: string[];
+  // to build its context, so the frontend never needs to pass pointers itself.
+  pointers: string[];
 }
 
 export interface SchemaType {

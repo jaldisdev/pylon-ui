@@ -2,6 +2,7 @@ import type React from "react";
 import { Link, useParams } from "react-router-dom";
 import { Card } from "@/ui/Card";
 import { Database, Sparkles, SquarePen, Table2, Terminal } from "lucide-react";
+import { useStats } from "@/lib/api/useStats";
 
 // Action buttons
 const actions = [
@@ -13,11 +14,12 @@ const actions = [
 
 export const DashboardTab: React.FC = () => {
   const { branch } = useParams();
+  const { data } = useStats();
 
   // Statistics
   const stats = [
-    { value: 12345, label: "objects" },
-    { value: 456, label: "object types" },
+    { value: data?.objects ?? "—", label: "objects" },
+    { value: data?.types ?? "—", label: "object types" },
   ];
 
   // Output
