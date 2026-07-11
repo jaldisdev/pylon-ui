@@ -54,7 +54,7 @@ export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, 
   >
     <div className="min-w-0 flex-1">
       {pointer.kind === "enum" ? (
-        <EnumEditor pointer={pointer} schema={schema} initialValue={initialValue} onCommit={onCommit} />
+        <EnumEditor pointer={pointer} schema={schema} initialValue={initialValue} onCommit={onCommit} onDiscard={onDiscard} />
       ) : pointer.typeName === "std::bool" ? (
         <BoolEditor initialValue={initialValue} onCommit={onCommit} />
       ) : (
@@ -82,22 +82,21 @@ const EnumEditor: React.FC<{
   schema: SchemaResponse;
   initialValue: unknown;
   onCommit: (value: EditValue) => void;
-}> = ({pointer, schema, initialValue, onCommit}) => {
-  // Selecting an option and closing the menu without selecting anything both
-  // resolve to a commit (gel-ui: dropdown selection is a discrete, final
-  // action) — guarded so react-select's onChange-then-onMenuClose sequence
-  // for a single-select doesn't fire onCommit twice.
-  const committedRef = useRef(false);
+  onDiscard: () => void;
+}> = ({pointer, schema, initialValue, onCommit, onDiscard}) => {
+  // With `menuIsOpen` forced permanently true, react-select fires
+  // onMenuClose *before* onChange when an option is picked (confirmed
+  // empirically). onDiscard clears the store's activePropertyEdit pointer,
+  // which onCommit's commitPropertyEdit action needs to know which cell to
+  // write to — so calling onDiscard first turns the real commit into a
+  // silent no-op. Defer the discard to a microtask so a same-tick onChange
+  // (a real pick) always gets to mark `picked` first and cancel it; only an
+  // actual close-without-picking (Escape, click away) reaches the discard.
+  const pickedRef = useRef(false);
   const [module, name] = (pointer.target ?? "").split("::");
   const members = schema.enums.find((e) => e.module === module && e.name === name)?.members ?? [];
   const options: SelectOption[] = members.map((m) => ({value: m, label: m}));
   const initial = typeof initialValue === "string" ? (options.find((o) => o.value === initialValue) ?? null) : null;
-
-  const commitOnce = (value: string | null) => {
-    if (committedRef.current) return;
-    committedRef.current = true;
-    onCommit({valid: true, value});
-  };
 
   return (
     <Select
@@ -105,8 +104,15 @@ const EnumEditor: React.FC<{
       menuIsOpen
       options={options}
       value={initial}
-      onChange={(opt) => commitOnce(opt?.value ?? null)}
-      onMenuClose={() => commitOnce(initial?.value ?? null)}
+      onChange={(opt) => {
+        pickedRef.current = true;
+        onCommit({valid: true, value: opt?.value ?? null});
+      }}
+      onMenuClose={() => {
+        queueMicrotask(() => {
+          if (!pickedRef.current) onDiscard();
+        });
+      }}
     />
   );
 };
