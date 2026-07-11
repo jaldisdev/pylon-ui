@@ -137,14 +137,20 @@ export const api = {
     }),
 };
 
-export type SchemaPointerKind = "property" | "link" | "multiLink" | "computed" | "enum";
+export type SchemaPointerKind = "property" | "link" | "multiLink" | "computed" | "enum" | "namedTuple";
 
 export interface SchemaPointer {
   name: string;
   kind: SchemaPointerKind;
-  // Present for "link"/"multiLink" (the target type's "module::Name") and for
-  // "enum" (the enum type's own "module::Name").
+  // Present for "link"/"multiLink" (the target type's "module::Name"), for
+  // "enum" (the enum type's own "module::Name"), and for a *nominal*
+  // "namedTuple" (the named tuple type's own "module::Name" — see
+  // SchemaResponse.namedTuples).
   target?: string;
+  // "namedTuple" only, when it's a *structural* pylon.Tuple[...] (no
+  // registered type to reference via `target` — the shape is declared
+  // inline here instead).
+  members?: NamedTupleMember[];
   // Canonical PyQL/EdgeQL-style type name for "property"/"computed" pointers
   // (e.g. "std::str", "std::uuid", "cal::local_date") — shown below the
   // pointer name in the Data Explorer's column headers, and used to decide
@@ -193,7 +199,32 @@ export interface SchemaEnum {
   members: string[];
 }
 
+export type NamedTupleMemberKind = "scalar" | "enum" | "namedTuple";
+
+export interface NamedTupleMember {
+  // null for an unnamed/positional element of a structural tuple
+  // (e.g. `Tuple[Str, Bool]`); always set for a nominal named-tuple's field.
+  name: string | null;
+  kind: NamedTupleMemberKind;
+  // "scalar" only — e.g. "std::float64".
+  typeName?: string;
+  // "enum", or a *nominal* "namedTuple" member — the target type's own "module::Name".
+  target?: string;
+  // A *structural* "namedTuple" member (a nested `Tuple[...]`) — its elements, inline.
+  members?: NamedTupleMember[];
+  // Only meaningful for a nominal named-tuple's own fields — a structural
+  // tuple element has no independent optionality, so this is omitted there.
+  required?: boolean;
+}
+
+export interface SchemaNamedTuple {
+  module: string;
+  name: string;
+  members: NamedTupleMember[];
+}
+
 export interface SchemaResponse {
   types: SchemaType[];
   enums: SchemaEnum[];
+  namedTuples: SchemaNamedTuple[];
 }

@@ -1,4 +1,4 @@
-import type {SchemaPointer, SchemaResponse, SchemaType} from "@/lib/api/client";
+import type {NamedTupleMember, SchemaPointer, SchemaResponse, SchemaType} from "@/lib/api/client";
 import type {DeleteObjectEdit, EditValue, InsertObjectEdit, UpdateLinkEdit, UpdatePropertyEdit} from "./editsStore";
 
 // Ports gel-ui's generateStatements() (shared/studio/tabs/dataview/state/edits.ts)
@@ -60,9 +60,28 @@ const findType = (schema: SchemaResponse, qualname: string): SchemaType | undefi
   return schema.types.find((t) => t.module === module && t.name === name);
 };
 
-// The PyQL cast type for a property/enum pointer's value — e.g. "std::str",
-// or the enum's own qualified name for an enum cast (`<default::Gender>$p0`).
-const castTypeFor = (pointer: SchemaPointer): string => (pointer.kind === "enum" ? pointer.target! : (pointer.typeName ?? "str"));
+// The cast text for one named-tuple member/pointer's own type — the target
+// type's qualified name for a nominal member ({target}), or the reconstructed
+// `tuple<...>` text for a structural one ({members}), recursing for a nested
+// tuple member. Mirrors how an enum pointer already casts to its own
+// qualified name (`<default::Gender>`) rather than a generic escape hatch.
+const tupleCastText = (node: {target?: string; members?: NamedTupleMember[]}): string => {
+  if (node.target) return node.target;
+  const members = node.members ?? [];
+  const positional = members.every((m) => m.name === null);
+  const elementText = (m: NamedTupleMember): string => {
+    const typeText = m.kind === "namedTuple" ? tupleCastText(m) : m.kind === "enum" ? m.target! : (m.typeName ?? "str");
+    return positional ? typeText : `${m.name}: ${typeText}`;
+  };
+  return `tuple<${members.map(elementText).join(", ")}>`;
+};
+
+// The PyQL cast type for a property/enum/namedTuple pointer's value — e.g.
+// "std::str", the enum's own qualified name for an enum cast
+// (`<default::Gender>$p0`), or the named tuple's own qualified name (nominal)
+// / reconstructed `tuple<...>` text (structural) for a namedTuple cast.
+const castTypeFor = (pointer: SchemaPointer): string =>
+  pointer.kind === "enum" ? pointer.target! : pointer.kind === "namedTuple" ? tupleCastText(pointer) : (pointer.typeName ?? "str");
 
 const groupLinkEditsByObjectId = (linkEdits: Map<string, UpdateLinkEdit>): Map<string | number, UpdateLinkEdit[]> => {
   const byId = new Map<string | number, UpdateLinkEdit[]>();

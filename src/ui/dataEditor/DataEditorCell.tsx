@@ -6,6 +6,8 @@ import type {SchemaPointer, SchemaResponse} from "@/lib/api/client";
 import {coerceParamValue, validateCastValue} from "@/lib/editor/lang-pyql/extractParams";
 import type {EditValue} from "@/features/dataExplorer/state/editsStore";
 import {Select, type SelectOption} from "@/ui/Select";
+import {resolveTupleMembers} from "@/ui/dataEditor/TupleEditor";
+import {TuplePopover} from "@/ui/dataEditor/TuplePopover";
 
 // Inline per-scalar-type cell editor, mounted in place of a grid cell on
 // double-click — mirrors gel-ui's dataEditor component library
@@ -54,7 +56,15 @@ export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, 
       }}
     >
       <div className="min-w-0 flex-1">
-        {pointer.kind === "enum" ? (
+        {pointer.kind === "namedTuple" ? (
+          <TuplePopover
+            members={resolveTupleMembers(pointer, schema)}
+            schema={schema}
+            initialValue={initialValue}
+            onCommit={onCommit}
+            onDiscard={onDiscard}
+          />
+        ) : pointer.kind === "enum" ? (
           <EnumEditor pointer={pointer} schema={schema} initialValue={initialValue} onCommit={onCommit} onDiscard={onDiscard} />
         ) : pointer.typeName === "std::bool" ? (
           <BoolEditor initialValue={initialValue} onCommit={onCommit} />
