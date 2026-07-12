@@ -267,7 +267,12 @@ const buildInsertStatement = (
   for (const pointer of type?.pointers ?? []) {
     if (pointer.name === "id") continue;
 
-    if (pointer.kind === "property") {
+    // "property" is the common case, but an enum or (nominal/structural)
+    // named-tuple pointer is stored in insert.data exactly the same way —
+    // castTypeFor/pointerTypeTag already know how to cast/tag each kind, so
+    // narrowing this check to just "property" only meant those two kinds
+    // were silently dropped from the generated insert entirely.
+    if (pointer.kind === "property" || pointer.kind === "enum" || pointer.kind === "namedTuple") {
       const value = insert.data[pointer.name];
       if (value === undefined) {
         if (pointer.required && !pointer.hasDefault) error = `missing required property '${pointer.name}'`;
