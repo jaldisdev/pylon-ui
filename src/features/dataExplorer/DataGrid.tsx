@@ -10,7 +10,7 @@ import {lookupPointerTypeTag} from "@/lib/schema/typeTags";
 import {ScalarValue} from "@/ui/ScalarValue";
 import {DataEditorCell} from "@/ui/dataEditor/DataEditorCell";
 import {LinkPropertyCell} from "@/ui/dataEditor/LinkPropertyCell";
-import {useDataEditsStore, type EditValue} from "@/features/dataExplorer/state/editsStore";
+import {useDataEditsStore, type EditValue, type UpdateLinkEdit} from "@/features/dataExplorer/state/editsStore";
 
 export type SortDir = "ASC" | "DESC";
 type Row = Record<string, unknown>;
@@ -47,6 +47,10 @@ interface DataGridProps {
   sortDir: SortDir | null;
   onSort: (fieldName: string) => void;
   onNavigateLink: (row: Row, pointer: SchemaPointer) => void;
+  // Opens the (non-URL) target picker for a pending insert row's own link —
+  // a temp id has nothing to navigate to, so this is a separate callback
+  // rather than reusing onNavigateLink's row-based signature.
+  onNavigateInsertLink: (tempId: number, pointer: SchemaPointer) => void;
   linkEditMode?: LinkEditMode;
 }
 
@@ -78,9 +82,10 @@ const isEditableCell = (pointer: SchemaPointer, isInsertRow: boolean) =>
 // icon / link-edit-mode checkbox), a pinned id column, sortable
 // property/enum headers, type-aware cells, and double-click-to-edit on
 // non-readonly property/enum cells. Link/multi-link cells show "N objects →"
-// and are clickable to navigate; pending-insert rows can't be navigated into
-// yet (see the LinkCell branch below) — setting their own links happens via
-// auto-link-on-create from a parent's link-edit mode instead.
+// and are clickable to navigate — both push a URL-based nested view; a
+// pending-insert row has no real id to address by, so onNavigateInsertLink
+// builds that path segment from its position among same-type pending
+// inserts instead (matching Gel's own convention — see stack.ts).
 export const DataGrid: React.FC<DataGridProps> = ({
   pylonType,
   pointers,
@@ -90,6 +95,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   sortDir,
   onSort,
   onNavigateLink,
+  onNavigateInsertLink,
   linkEditMode,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -112,11 +118,17 @@ export const DataGrid: React.FC<DataGridProps> = ({
 
   const displayRows = useMemo<DisplayRow[]>(() => {
     const pendingInserts = Array.from(insertEdits.values()).filter((ins) => ins.objectTypeName === pylonType);
-    return [
+    const all = [
       ...pendingInserts.map((ins): DisplayRow => ({kind: "insert", tempId: ins.id})),
       ...rows.map((row): DisplayRow => ({kind: "fetched", row})),
     ];
-  }, [insertEdits, pylonType, rows]);
+    if (!linkEditMode) return all;
+    // An object can never be its own link target — only actually excludes
+    // anything for a self-referential pointer (e.g. Person.friends:
+    // MultiLink[Person]), where the row being edited would otherwise show up
+    // as a pickable candidate for its own pointer too.
+    return all.filter((r) => (r.kind === "insert" ? r.tempId : ((r.row.id as string | undefined) ?? "")) !== linkEditMode.parentId);
+  }, [insertEdits, pylonType, rows, linkEditMode]);
 
   const columns = useMemo<ColumnDef<Row>[]>(
     () => pointers.map((pointer) => ({id: pointer.name, accessorKey: pointer.name})),
@@ -293,7 +305,11 @@ export const DataGrid: React.FC<DataGridProps> = ({
                   return (
                     <td
                       key={pointer.name}
-                      onClick={() => isLink && !isInsertRow && onNavigateLink(displayRow.kind === "fetched" ? displayRow.row : {}, pointer)}
+                      onClick={() => {
+                        if (!isLink) return;
+                        if (isInsertRow) onNavigateInsertLink(objectId as number, pointer);
+                        else onNavigateLink(displayRow.kind === "fetched" ? displayRow.row : {}, pointer);
+                      }}
                       onDoubleClick={() => {
                         if (!cellEditable) return;
                         startEditingCell({objectId, objectTypeName: pylonType, pointerName: pointer.name});
@@ -301,7 +317,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                       className={clsx(
                         "max-w-60 overflow-hidden border-b border-border px-2 py-2.5 font-mono text-ellipsis whitespace-nowrap",
                         pointer.name === "id" && "sticky left-10 bg-surface group-hover/row:bg-surface-hover",
-                        isLink && !isInsertRow && "cursor-pointer"
+                        isLink && "cursor-pointer"
                       )}
                     >
                       {isEditing ? (
@@ -314,7 +330,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                         />
                       ) : isLink ? (
                         isInsertRow ? (
-                          <span className="text-fg-muted">—</span>
+                          <InsertLinkCell tempId={objectId as number} pointer={pointer} linkEdits={linkEdits} />
                         ) : (
                           <LinkCell value={rawFetchedValue} pointer={pointer} />
                         )
@@ -425,6 +441,26 @@ const LinkCell: React.FC<{value: unknown; pointer: SchemaPointer}> = ({value, po
   return (
     <span className={clsx("flex items-center gap-1", items.length === 0 ? "text-fg-muted" : "text-fg")}>
       {items.length === 0 ? "{}" : `${items.length} object${items.length === 1 ? "" : "s"}`}
+      <ArrowRight size={12} />
+    </span>
+  );
+};
+
+// Same "N objects →" display as LinkCell, but counting pending link-edit
+// state for a not-yet-saved insert row — it has no fetched server value to
+// read from, only whatever's been added via the insert-link picker so far
+// (existing-object adds in `changes`, plus same-batch pending-insert targets
+// in `inserts`).
+const InsertLinkCell: React.FC<{tempId: number; pointer: SchemaPointer; linkEdits: Map<string, UpdateLinkEdit>}> = ({
+  tempId,
+  pointer,
+  linkEdits,
+}) => {
+  const edit = linkEdits.get(`${tempId}__${pointer.name}`);
+  const count = edit ? Array.from(edit.changes.values()).filter((c) => c.kind === "add").length + edit.inserts.size : 0;
+  return (
+    <span className={clsx("flex items-center gap-1", count === 0 ? "text-fg-muted" : "text-fg")}>
+      {count === 0 ? "{}" : `${count} object${count === 1 ? "" : "s"}`}
       <ArrowRight size={12} />
     </span>
   );

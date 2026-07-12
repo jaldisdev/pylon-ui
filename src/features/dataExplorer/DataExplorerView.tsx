@@ -1,18 +1,18 @@
 import type React from "react";
-import {useMemo, useState} from "react";
+import {useEffect, useMemo, useState} from "react";
 import {useNavigate} from "react-router-dom";
 import {useQuery} from "@tanstack/react-query";
 import {ArrowLeft, Filter, Link2, RefreshCw} from "lucide-react";
 import clsx from "clsx";
 
-import {api} from "@/lib/api/client";
+import {api, type SchemaPointer} from "@/lib/api/client";
 import {useSchema} from "@/lib/api/useSchema";
 import {useTheme} from "@/lib/theme/useTheme";
 import {DataGrid, type LinkEditMode, type SortDir} from "@/features/dataExplorer/DataGrid";
 import {FilterPanel} from "@/features/dataExplorer/FilterPanel";
 import {InsertRowButton} from "@/features/dataExplorer/InsertRowButton";
 import {ObjectTypeSelect} from "@/features/dataExplorer/ObjectTypeSelect";
-import {stackToPath, type StackEntry} from "@/features/dataExplorer/stack";
+import {parseInsertIndex, stackToPath, type StackEntry} from "@/features/dataExplorer/stack";
 import {useDataEditsStore} from "@/features/dataExplorer/state/editsStore";
 
 type Row = Record<string, unknown>;
@@ -52,6 +52,30 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
   // checkbox/radio per row, matching gel-ui's link-picker-is-the-grid design.
   const [linkEditModeOn, setLinkEditModeOn] = useState(false);
   const createNewRow = useDataEditsStore((s) => s.createNewRow);
+  const insertEdits = useDataEditsStore((s) => s.insertEdits);
+
+  // A pending (not-yet-saved) insert row has no persisted uuid to nest under
+  // — matching Gel's own convention, its position among same-type pending
+  // inserts (0, 1, 2, ...) addresses it in the URL instead (see
+  // navigateInsertLink below, and stack.ts's parseInsertIndex). Resolved
+  // back to the pending insert's real temp id here, since that's what the
+  // edits store actually keys link edits by.
+  const parentInsertIndex = current.parent ? parseInsertIndex(current.parent.id) : null;
+  const isInsertParent = parentInsertIndex !== null;
+  const parentTempId =
+    parentInsertIndex !== null && current.parent
+      ? Array.from(insertEdits.values()).filter((ins) => ins.objectTypeName === current.parent!.parentType)[parentInsertIndex]?.id
+      : undefined;
+
+  // Stale/invalid reference (e.g. the pending insert it pointed to was
+  // removed since this URL was generated) — bounce back a level rather than
+  // rendering against a missing owner, mirroring how parseStack itself stops
+  // at the first invalid segment instead of crashing.
+  useEffect(() => {
+    if (isInsertParent && parentTempId === undefined) {
+      navigate(`${basePath}/${stackToPath(stack.slice(0, -1))}`, {replace: true});
+    }
+  }, [isInsertParent, parentTempId, basePath, navigate, stack]);
 
   // The parent's own pointer for this link (only set when nested) — tells us
   // whether it's a single-link (radio, exclusive) or multi-link (checkbox),
@@ -72,26 +96,27 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
     const orderClause = sortField ? ` order by .${sortField} ${sortDir}` : "";
     const filterClause = filterExpr ? ` filter ${filterExpr}` : "";
 
-    if (current.parent && !linkEditModeOn) {
-      // Nested view (not editing links): fetch the parent by id with the
-      // link field's shape embedded — simpler and verified-working, vs.
-      // trying to make the *target* type the top-level SELECT subject via a
-      // reverse filter.
+    if (current.parent && !isInsertParent && !linkEditModeOn) {
+      // Nested view of a real, persisted parent (not editing links): fetch
+      // the parent by id with the link field's shape embedded — simpler and
+      // verified-working, vs. trying to make the *target* type the
+      // top-level SELECT subject via a reverse filter.
       return {
         pyql: `select ${current.parent.parentType} { ${current.parent.fieldName}: { ${shape} }${filterClause}${orderClause} limit 500 } filter .id = <uuid>$parentId`,
         params: {parentId: current.parent.id},
         extractField: current.parent.fieldName,
       };
     }
-    // Root view, or a nested view in "Edit links" mode — either way we want
-    // every object of the target type as a normal top-level SELECT, so link
-    // candidates aren't limited to what's already linked.
+    // Root view, a nested view in "Edit links" mode, or a nested view whose
+    // parent is a pending insert row (nothing persisted to fetch by id) —
+    // all three want the full target type as a normal top-level SELECT, so
+    // link candidates aren't limited to what's already linked.
     return {
       pyql: `SELECT ${current.pylonType} { ${shape} }${filterClause}${orderClause} offset 0 limit 500`,
       params: undefined,
       extractField: null as string | null,
     };
-  }, [pointers, sortField, sortDir, filterExpr, current, linkEditModeOn]);
+  }, [pointers, sortField, sortDir, filterExpr, current, linkEditModeOn, isInsertParent]);
 
   const dataQuery = useQuery({
     queryKey: ["dataExplorer", "objects", current, sortField, sortDir, filterExpr, linkEditModeOn],
@@ -117,11 +142,13 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
       const res = await api.runQuery(`select count((select ${current.pylonType}${filterClause}))`);
       return res.objects[0] as number;
     },
-    enabled: !current.parent || linkEditModeOn,
+    enabled: !current.parent || linkEditModeOn || isInsertParent,
   });
 
   // Which target ids are already linked on the server — only needed in
-  // "Edit links" mode, to seed each row's checkbox/radio starting state.
+  // "Edit links" mode for a real (persisted) parent, to seed each row's
+  // checkbox/radio starting state. A pending insert row never has anything
+  // linked on the server yet, so this is skipped entirely for it.
   const linkedIdsQuery = useQuery({
     queryKey: ["dataExplorer", "linkedIds", current.parent?.parentType, current.parent?.id, current.parent?.fieldName],
     queryFn: async () => {
@@ -133,29 +160,40 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
       const items = (Array.isArray(extracted) ? extracted : extracted ? [extracted] : []) as Row[];
       return new Set(items.map((item) => item.id as string));
     },
-    enabled: !!current.parent && linkEditModeOn,
+    enabled: !!current.parent && linkEditModeOn && !isInsertParent,
   });
 
   const linkEditMode: LinkEditMode | undefined =
-    current.parent && linkEditModeOn
+    current.parent && (linkEditModeOn || isInsertParent) && (!isInsertParent || parentTempId !== undefined)
       ? {
-          parentId: current.parent.id,
+          parentId: isInsertParent ? parentTempId! : current.parent.id,
           parentObjectTypeName: current.parent.parentType,
           pointerName: current.parent.fieldName,
           linkTypeName: current.pylonType,
           single: isSingleLink,
-          linkedIds: linkedIdsQuery.data ?? new Set(),
+          linkedIds: isInsertParent ? new Set() : (linkedIdsQuery.data ?? new Set()),
           throughPointers: throughPointers && throughPointers.length > 0 ? throughPointers : undefined,
         }
       : undefined;
 
-  const objectCount = current.parent && !linkEditModeOn ? (dataQuery.data?.length ?? null) : (countQuery.data ?? null);
+  const objectCount =
+    current.parent && !linkEditModeOn && !isInsertParent ? (dataQuery.data?.length ?? null) : (countQuery.data ?? null);
 
   const goBack = () => navigate(`${basePath}/${stackToPath(stack.slice(0, -1))}`);
 
   const navigateLink = (row: Row, pointer: {name: string}) => {
     const id = (row.id as string | undefined) ?? "";
     navigate(`${basePath}/${stackToPath(stack)}/${id}/${pointer.name}`);
+  };
+
+  // Same nested-view navigation as navigateLink, but for a pending insert
+  // row — addressed by its position among same-type pending inserts rather
+  // than a (nonexistent) persisted id, matching Gel's own convention.
+  const navigateInsertLink = (tempId: number, pointer: SchemaPointer) => {
+    const sameType = Array.from(insertEdits.values()).filter((ins) => ins.objectTypeName === current.pylonType);
+    const index = sameType.findIndex((ins) => ins.id === tempId);
+    if (index === -1) return;
+    navigate(`${basePath}/${stackToPath(stack)}/${index}/${pointer.name}`);
   };
 
   const toggleSort = (fieldName: string) => {
@@ -184,7 +222,10 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
                 <ArrowLeft size={16} strokeWidth={1.75} />
               </button>
               <div className="font-mono text-sm">
-                <div className="text-fg-muted">{current.parent.parentType}</div>
+                <div className="text-fg-muted">
+                  {current.parent.parentType}
+                  {isInsertParent && " (new)"}
+                </div>
                 <div className="text-2xs text-fg-muted/70">.{current.parent.fieldName}</div>
               </div>
             </>
@@ -217,7 +258,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
         </div>
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-          {current.parent && parentPointer && parentPointer.kind !== "computed" && (
+          {current.parent && !isInsertParent && parentPointer && parentPointer.kind !== "computed" && (
             <button
               type="button"
               onClick={() => setLinkEditModeOn((o) => !o)}
@@ -241,16 +282,16 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
             </button>
           )}
 
-          {(!current.parent || linkEditModeOn) && schema && schemaType && (
+          {(!current.parent || linkEditModeOn || isInsertParent) && schema && schemaType && (
             <InsertRowButton
               schema={schema}
               schemaType={schemaType}
               onInsert={(concreteTypeName) =>
                 createNewRow(
                   concreteTypeName,
-                  current.parent && linkEditModeOn
+                  current.parent && (linkEditModeOn || isInsertParent) && (!isInsertParent || parentTempId !== undefined)
                     ? {
-                        parentId: current.parent.id,
+                        parentId: isInsertParent ? parentTempId! : current.parent.id,
                         parentObjectTypeName: current.parent.parentType,
                         pointerName: current.parent.fieldName,
                         linkTypeName: current.pylonType,
@@ -297,6 +338,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
           sortDir={sortField ? sortDir : null}
           onSort={toggleSort}
           onNavigateLink={navigateLink}
+          onNavigateInsertLink={navigateInsertLink}
           linkEditMode={linkEditMode}
         />
       ) : (
