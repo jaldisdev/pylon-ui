@@ -3,7 +3,7 @@ import {useMemo, useRef} from "react";
 import clsx from "clsx";
 import {getCoreRowModel, useReactTable, type ColumnDef} from "@tanstack/react-table";
 import {useVirtualizer} from "@tanstack/react-virtual";
-import {ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, Menu, Trash2, Undo2} from "lucide-react";
+import {ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, Link2, Menu, Trash2, Undo2} from "lucide-react";
 
 import type {SchemaPointer, SchemaResponse} from "@/lib/api/client";
 import {lookupPointerTypeTag} from "@/lib/schema/typeTags";
@@ -400,6 +400,24 @@ const GutterCell: React.FC<GutterCellProps> = ({
   onToggleLink,
 }) => {
   if (linkEditMode) {
+    // A single-link's *checked* row can't be a plain radio: browsers never
+    // fire onChange for a click on an already-checked radio (no state
+    // transition to report), so there'd be no way to clear it back to
+    // unset. Once checked, it switches to a real button instead — clicking
+    // it always fires, unlinking it — matching Gel's own solid "linked"
+    // badge for this exact reason.
+    if (linkSingle && linkChecked) {
+      return (
+        <button
+          type="button"
+          onClick={onToggleLink}
+          title="Unlink"
+          className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-fg hover:opacity-90"
+        >
+          <Link2 size={12} strokeWidth={2} />
+        </button>
+      );
+    }
     return (
       <input
         type={linkSingle ? "radio" : "checkbox"}

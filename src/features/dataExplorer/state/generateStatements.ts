@@ -141,7 +141,10 @@ const buildLinkExpr = (
   const targetType = edit.linkTypeName;
   const isMulti = pointer.kind === "multiLink";
 
-  if (edit.setNull) return {parts: [{op: ":=", expr: `${targetType}{}`}]};
+  // `TargetType{}` is a shape query (needs a real FROM-like context, not
+  // valid as a bare assignment expression) — the correct way to unset a
+  // link is a cast of the empty set literal, `<TargetType>{}`.
+  if (edit.setNull) return {parts: [{op: ":=", expr: `<${targetType}>{}`}]};
 
   const throughPointers =
     isMulti && pointer.through ? findType(schema, pointer.through)?.pointers.filter((p) => p.name !== "id") : undefined;
@@ -201,7 +204,9 @@ const buildLinkExpr = (
 
   if (!isMulti || isInsert) {
     // Single-link, or any insert's own link field: always a full replace.
-    return {parts: [{op: ":=", expr: addExprParts[0] ?? `${targetType}{}`}], error};
+    // `<TargetType>{}` (not a bare `TargetType{}` shape query) when there's
+    // nothing to link — see the setNull branch above for why.
+    return {parts: [{op: ":=", expr: addExprParts[0] ?? `<${targetType}>{}`}], error};
   }
 
   if (hasAdds && !hasRemoves) return {parts: [{op: "+=", expr: addExprParts.join(" union ")}], error};
