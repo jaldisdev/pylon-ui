@@ -13,6 +13,7 @@ export const Sidebar: React.FC = () => (
       <Tooltip key={tab.path} label={tab.label} side="right">
         <NavLink
           to={tab.path}
+          end={tab.path === ""}
           className={({isActive}) =>
             clsx(
               "flex h-10 w-10 items-center justify-center rounded-lg text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg",

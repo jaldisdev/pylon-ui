@@ -11,6 +11,7 @@ export const MobileNav: React.FC = () => (
       <NavLink
         key={tab.path}
         to={tab.path}
+        end={tab.path === ""}
         className={({isActive}) =>
           clsx(
             "flex flex-col items-center gap-0.5 rounded-lg px-3 py-1.5 text-fg-muted",
