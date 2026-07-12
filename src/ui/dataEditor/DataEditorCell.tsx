@@ -39,8 +39,29 @@ const toEditValue = (raw: string, castType: string | null): EditValue => {
   return error ? {valid: false, raw, error} : {valid: true, value: coerceParamValue(raw, castType)};
 };
 
+// null and undefined both mean "unset" here — a cell whose value starts out
+// undefined (never fetched a value) and one that starts out null (explicitly
+// cleared) must compare equal so re-committing either doesn't look "changed".
+const normalizeForCompare = (value: unknown): unknown => (value === undefined ? null : value);
+
+const isUnchanged = (value: EditValue, initialValue: unknown): boolean =>
+  value.valid && JSON.stringify(normalizeForCompare(value.value)) === JSON.stringify(normalizeForCompare(initialValue));
+
 export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, initialValue, onCommit, onDiscard}) => {
   const optional = !pointer.required;
+  // Every editor below commits through this instead of the raw prop — a
+  // committed value that's identical to what the cell already held (e.g. the
+  // popover was opened and closed untouched, or the same option was
+  // re-picked) discards instead of registering a pending edit, so the row
+  // doesn't spuriously flip to "touched".
+  const commitIfChanged = (value: EditValue) => {
+    if (isUnchanged(value, initialValue)) {
+      onDiscard();
+      return;
+    }
+    onCommit(value);
+  };
+
   return (
     <div
       className="flex items-stretch"
@@ -57,17 +78,23 @@ export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, 
             members={resolveTupleMembers(pointer, schema)}
             schema={schema}
             initialValue={initialValue}
-            onCommit={onCommit}
+            onCommit={commitIfChanged}
             onDiscard={onDiscard}
           />
         ) : pointer.kind === "array" && pointer.element ? (
-          <ArrayPopover element={pointer.element} schema={schema} initialValue={initialValue} onCommit={onCommit} onDiscard={onDiscard} />
+          <ArrayPopover
+            element={pointer.element}
+            schema={schema}
+            initialValue={initialValue}
+            onCommit={commitIfChanged}
+            onDiscard={onDiscard}
+          />
         ) : pointer.kind === "enum" ? (
-          <EnumEditor pointer={pointer} schema={schema} initialValue={initialValue} onCommit={onCommit} onDiscard={onDiscard} />
+          <EnumEditor pointer={pointer} schema={schema} initialValue={initialValue} onCommit={commitIfChanged} onDiscard={onDiscard} />
         ) : pointer.typeName === "std::bool" ? (
-          <BoolEditor initialValue={initialValue} onCommit={onCommit} />
+          <BoolEditor initialValue={initialValue} onCommit={commitIfChanged} />
         ) : (
-          <TextEditor pointer={pointer} initialValue={initialValue} onCommit={onCommit} squareRight={optional} />
+          <TextEditor pointer={pointer} initialValue={initialValue} onCommit={commitIfChanged} squareRight={optional} />
         )}
       </div>
       {/* Optional pointers get an explicit "clear to {}" action, matching
@@ -79,7 +106,7 @@ export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, 
         <button
           type="button"
           title="Set to {}"
-          onClick={() => onCommit({valid: true, value: null})}
+          onClick={() => commitIfChanged({valid: true, value: null})}
           className="flex shrink-0 items-center justify-center rounded-r-md bg-orange-500 px-2 font-mono text-2sm font-medium text-white hover:opacity-90 dark:bg-orange-600"
         >
           {"{}"}

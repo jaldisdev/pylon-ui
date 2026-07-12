@@ -137,6 +137,13 @@ interface DataEditsState {
 
 const editKey = (objectId: string | number, pointerName: string) => `${objectId}__${pointerName}`;
 
+// True once an edit has cancelled itself out entirely (e.g. add-then-remove,
+// or remove-then-re-add, of the same target) — the pointer is back to its
+// original state and the map entry should be dropped, not kept as a
+// zero-op edit that would still flip the row to "touched".
+const isEmptyLinkEdit = (edit: UpdateLinkEdit): boolean =>
+  !edit.setNull && edit.changes.size === 0 && edit.inserts.size === 0;
+
 const emptyLinkEdit = (
   objectId: string | number,
   objectTypeName: string,
@@ -244,7 +251,7 @@ export const useDataEditsStore = create<DataEditsState>()((set, get) => ({
         if (!edit.inserts.has(tempId)) continue;
         const inserts = new Set(edit.inserts);
         inserts.delete(tempId);
-        if (inserts.size === 0 && edit.changes.size === 0 && !edit.setNull) {
+        if (isEmptyLinkEdit({...edit, inserts})) {
           linkEdits.delete(key);
         } else {
           linkEdits.set(key, {...edit, inserts});
@@ -285,9 +292,19 @@ export const useDataEditsStore = create<DataEditsState>()((set, get) => ({
       // A single-link can only reference one target — selecting a new one
       // always clears any other pending change/insert for this pointer first.
       const changes = single ? new Map<string, LinkChange>() : new Map(existing.changes);
-      changes.set(target.id, {kind: "add", id: target.id, typename: target.typename});
+      // Re-adding a target that was only pending *removal* this session (not
+      // yet committed) just cancels the pending remove — back to its
+      // original still-linked state — mirroring how removeLinkUpdate cancels
+      // a pending add below.
+      if (changes.get(target.id)?.kind === "remove") {
+        changes.delete(target.id);
+      } else {
+        changes.set(target.id, {kind: "add", id: target.id, typename: target.typename});
+      }
       const inserts = single ? new Set<number>() : existing.inserts;
-      linkEdits.set(key, {...existing, setNull: false, changes, inserts});
+      const next = {...existing, setNull: false, changes, inserts};
+      if (isEmptyLinkEdit(next)) linkEdits.delete(key);
+      else linkEdits.set(key, next);
       return {linkEdits};
     });
   },
@@ -305,7 +322,9 @@ export const useDataEditsStore = create<DataEditsState>()((set, get) => ({
       } else {
         changes.set(targetId, {kind: "remove", id: targetId, typename: linkTypeName});
       }
-      linkEdits.set(key, {...existing, changes});
+      const next = {...existing, changes};
+      if (isEmptyLinkEdit(next)) linkEdits.delete(key);
+      else linkEdits.set(key, next);
       return {linkEdits};
     });
   },
@@ -328,7 +347,9 @@ export const useDataEditsStore = create<DataEditsState>()((set, get) => ({
         inserts = new Set(existing.inserts);
         inserts.add(tempId);
       }
-      linkEdits.set(key, {...existing, setNull: false, changes, inserts});
+      const next = {...existing, setNull: false, changes, inserts};
+      if (isEmptyLinkEdit(next)) linkEdits.delete(key);
+      else linkEdits.set(key, next);
       return {linkEdits};
     });
   },
