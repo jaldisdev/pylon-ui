@@ -322,7 +322,12 @@ export const DataGrid: React.FC<DataGridProps> = ({
                           {isInvalid ? (
                             <span>{editValue.raw || "(empty)"}</span>
                           ) : (
-                            <ScalarValue value={displayValue} typeTag={lookupPointerTypeTag(schema, pylonType, pointer.name)} compact />
+                            <ScalarValue
+                              value={displayValue}
+                              typeTag={lookupPointerTypeTag(schema, pylonType, pointer.name)}
+                              schema={schema}
+                              compact
+                            />
                           )}
                           {hasEdit && !isInsertRow && (
                             <button

@@ -1,9 +1,11 @@
 import type React from "react";
 import clsx from "clsx";
 
-import type {SchemaResponse} from "@/lib/api/client";
+import type {NamedTupleMember, SchemaResponse} from "@/lib/api/client";
 import type {ExtractedParam} from "@/lib/editor/lang-pyql/extractParams";
 import {Select, type SelectOption} from "@/ui/Select";
+import {defaultTupleValue, TupleEditor} from "@/ui/dataEditor/TupleEditor";
+import {resolveTupleParamMembers} from "@/features/queryEditor/tupleParamCast";
 
 interface ParamsPanelProps {
   params: ExtractedParam[];
@@ -21,6 +23,32 @@ const findEnum = (schema: SchemaResponse | undefined, castType: string | null) =
   if (!schema || !castType) return null;
   const [module, name] = castType.includes("::") ? castType.split("::") : ["default", castType];
   return schema.enums.find((e) => e.module === module && e.name === name) ?? null;
+};
+
+const safeParseJson = (raw: string): unknown => {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+};
+
+// Embedded (no popover, always visible) tuple param editor — the query
+// editor's params panel is itself always-visible, matching gel-ui's own
+// param panel, so a tuple param renders its TupleEditor inline rather than
+// behind a click-to-open popover like the Data Explorer's grid cells.
+const TupleParamEditor: React.FC<{
+  name: string;
+  members: NamedTupleMember[];
+  raw: string;
+  schema: SchemaResponse;
+  onChange: (name: string, raw: string) => void;
+}> = ({name, members, raw, schema, onChange}) => {
+  const parsed = raw ? safeParseJson(raw) : undefined;
+  const value = parsed ?? defaultTupleValue(members, schema);
+  return (
+    <TupleEditor members={members} schema={schema} value={value} onChange={(next) => onChange(name, JSON.stringify(next))} />
+  );
 };
 
 // One labeled input per $name parameter detected in the query text, styled
@@ -45,7 +73,11 @@ export const ParamsPanel: React.FC<ParamsPanelProps> = ({params, values, errors,
           // bad value — shown regardless of what's typed, and takes
           // precedence over the value's own validation error.
           const error = param.castConflict ?? errors[param.name];
-          const isMissingRequired = param.required && raw.trim() === "";
+          const tupleMembers = resolveTupleParamMembers(param.castType, schema);
+          // A tuple param always renders with a fully-populated default
+          // draft (see TupleParamEditor) — it's never "missing", unlike a
+          // blank scalar input.
+          const isMissingRequired = !tupleMembers && param.required && raw.trim() === "";
           const invalid = !!error || isMissingRequired;
           const paramEnum = findEnum(schema, param.castType);
 
@@ -53,7 +85,9 @@ export const ParamsPanel: React.FC<ParamsPanelProps> = ({params, values, errors,
             <div key={param.name} className="flex items-start gap-2">
               <span className="w-20 shrink-0 pt-2.5 font-mono text-2xs text-fg-muted">${param.name}</span>
               <div className="min-w-0 flex-1">
-                {paramEnum ? (
+                {tupleMembers && schema ? (
+                  <TupleParamEditor name={param.name} members={tupleMembers} raw={raw} schema={schema} onChange={onChange} />
+                ) : paramEnum ? (
                   <Select
                     options={paramEnum.members.map((m): SelectOption => ({value: m, label: m}))}
                     value={raw ? {value: raw, label: raw} : null}

@@ -83,7 +83,10 @@ export const ReplEntry: React.FC<ReplEntryProps> = ({entry, branch, showDateHead
                     "after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-8 after:content-[''] after:bg-[linear-gradient(0deg,var(--color-surface),var(--color-surface)_12px,transparent)]"
                 )}
               >
-                <JsonTree value={visible} />
+                <JsonTree
+                  value={visible}
+                  valueShape={entry.shape !== undefined ? {kind: "array", element: entry.shape} : undefined}
+                />
               </div>
               {truncated && (
                 <div className="pb-1 text-center">

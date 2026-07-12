@@ -2,6 +2,8 @@ import type React from "react";
 import clsx from "clsx";
 import {X} from "lucide-react";
 
+import type {ValueShapeTag} from "@/lib/api/client";
+
 export interface HistoryEntry {
   id: string;
   pyql: string;
@@ -11,7 +13,9 @@ export interface HistoryEntry {
   // result, error) instantly, matching Gel — not just the query text, which
   // would otherwise need a re-run against a possibly-since-changed database.
   paramValues: Record<string, string>;
-  result: {objects: unknown[]; durationMs: number} | null;
+  // `shape` is optional — entries persisted before it was added won't have
+  // it; JsonTree falls back to a pointer-name-based guess when it's absent.
+  result: {objects: unknown[]; durationMs: number; shape?: ValueShapeTag} | null;
   error: string | null;
 }
 

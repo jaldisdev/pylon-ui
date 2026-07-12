@@ -1,11 +1,16 @@
 import type React from "react";
 import {Loader2} from "lucide-react";
 
+import type {ValueShapeTag} from "@/lib/api/client";
 import {JsonTree} from "@/ui/JsonTree";
 
 export interface QueryResult {
   objects: unknown[];
   durationMs: number;
+  // Optional — a result restored from a history entry persisted before this
+  // field was added won't have it; JsonTree falls back to a pointer-name
+  // guess when no shape is available.
+  shape?: ValueShapeTag;
 }
 
 interface ResultPanelProps {
@@ -44,7 +49,10 @@ export const ResultPanel: React.FC<ResultPanelProps> = ({isRunning, result, erro
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex-1 overflow-auto p-3">
-        <JsonTree value={result.objects} />
+        <JsonTree
+          value={result.objects}
+          valueShape={result.shape !== undefined ? {kind: "array", element: result.shape} : undefined}
+        />
       </div>
       <div className="flex h-7 shrink-0 select-none items-center justify-center bg-surface text-2xs text-fg-muted">
         {result.objects.length} object{result.objects.length === 1 ? "" : "s"} · {result.durationMs.toFixed(1)}ms

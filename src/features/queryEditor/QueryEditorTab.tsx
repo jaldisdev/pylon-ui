@@ -17,6 +17,8 @@ import {IconToggle} from "@/ui/IconToggle";
 import {HistoryPanel, type HistoryEntry} from "@/features/queryEditor/HistoryPanel";
 import {ParamsPanel} from "@/features/queryEditor/ParamsPanel";
 import {ResultPanel, type QueryResult} from "@/features/queryEditor/ResultPanel";
+import {resolveTupleParamMembers} from "@/features/queryEditor/tupleParamCast";
+import {defaultTupleValue} from "@/ui/dataEditor/TupleEditor";
 
 type Orientation = "horizontal" | "vertical";
 
@@ -69,7 +71,14 @@ export const QueryEditorTab: React.FC = () => {
   }, [params, paramValues]);
   const hasParamErrors =
     Object.values(paramErrors).some((e) => e !== null) ||
-    params.some((p) => p.castConflict !== null || (p.required && !paramValues[p.name]?.trim()));
+    params.some(
+      (p) =>
+        p.castConflict !== null ||
+        // A tuple param always has a fully-populated default draft (see
+        // ParamsPanel's TupleParamEditor) — it's never "missing" the way a
+        // blank scalar input is.
+        (p.required && !resolveTupleParamMembers(p.castType, schema) && !paramValues[p.name]?.trim())
+    );
   const isOutdated = result !== null && lastRunQueryText !== null && queryText !== lastRunQueryText;
   const canRun = queryText.trim().length > 0 && !hasParamErrors;
 
@@ -87,14 +96,27 @@ export const QueryEditorTab: React.FC = () => {
 
     const paramsDict =
       params.length > 0
-        ? Object.fromEntries(params.map((p) => [p.name, coerceParamValue(paramValues[p.name] ?? "", p.castType)]))
+        ? Object.fromEntries(
+            params.map((p) => {
+              const raw = paramValues[p.name] ?? "";
+              const tupleMembers = resolveTupleParamMembers(p.castType, schema);
+              if (tupleMembers) {
+                try {
+                  return [p.name, raw ? JSON.parse(raw) : defaultTupleValue(tupleMembers, schema!)];
+                } catch {
+                  return [p.name, defaultTupleValue(tupleMembers, schema!)];
+                }
+              }
+              return [p.name, coerceParamValue(raw, p.castType)];
+            })
+          )
         : undefined;
 
     mutation.mutate(
       {pyql, paramsDict},
       {
         onSuccess: (data) => {
-          const result = {objects: data.objects, durationMs: data.duration_ms};
+          const result = {objects: data.objects, durationMs: data.duration_ms, shape: data.shape};
           setResult(result);
           setError(null);
           setLastRunQueryText(pyql);

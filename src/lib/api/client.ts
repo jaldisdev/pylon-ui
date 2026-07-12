@@ -41,9 +41,25 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   return res.json() as Promise<T>;
 };
 
+// A position-free "value shape" tag tree, aligned with the already-decoded
+// JSON in QueryResponse.objects (not the compiler's position-based
+// ShapeNode) — lets JsonTree render type tags (`<uuid>`, enum labels, Gel's
+// `(x := 1, y := 2)` tuple literal syntax) for values that aren't a known
+// schema pointer, e.g. a bare top-level cast or a tuple nested inside a free
+// object, the same way it already does for object properties via
+// /api/schema. `null` means "no special tag for this value" (a plain
+// scalar). See pylon/query.py's shape_value_tags().
+export type ValueShapeTag =
+  | {kind: "enum"; enumType: string}
+  | {kind: "namedTuple"; typeName: string | null; members: {key: string | null; shape: ValueShapeTag}[] | null}
+  | {kind: "object"; typeName: string | null; pointers: Record<string, ValueShapeTag>}
+  | {kind: "array"; element: ValueShapeTag}
+  | null;
+
 export interface QueryResponse {
   objects: unknown[];
   duration_ms: number;
+  shape: ValueShapeTag;
 }
 
 export interface ConnectionsResponse {

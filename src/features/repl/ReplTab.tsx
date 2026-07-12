@@ -4,7 +4,7 @@ import {useParams} from "react-router-dom";
 import {useMutation} from "@tanstack/react-query";
 import {useHotkeys} from "react-hotkeys-hook";
 
-import {api, ApiError} from "@/lib/api/client";
+import {api, ApiError, type ValueShapeTag} from "@/lib/api/client";
 import {useSchema} from "@/lib/api/useSchema";
 import {CodeEditor, type CodeEditorHandle} from "@/lib/editor/CodeEditor";
 import {useLocalStorageState} from "@/lib/hooks/useLocalStorageState";
@@ -21,6 +21,9 @@ export interface HistoryEntry {
   timestamp: number;
   objects?: unknown[];
   durationMs?: number;
+  // Entries persisted before this field was added won't have it; ReplEntry
+  // falls back to a pointer-name guess when no shape is available.
+  shape?: ValueShapeTag;
   error?: string;
   isHelp?: boolean; // \help output — rendered as static text, not a query result
 }
@@ -86,7 +89,14 @@ export const ReplTab: React.FC = () => {
       onSuccess: (data) => {
         setHistory((h) => [
           ...h,
-          {id: h.length, pyql: text, timestamp: Date.now(), objects: data.objects, durationMs: data.duration_ms},
+          {
+            id: h.length,
+            pyql: text,
+            timestamp: Date.now(),
+            objects: data.objects,
+            durationMs: data.duration_ms,
+            shape: data.shape,
+          },
         ]);
       },
       onError: (err) => {

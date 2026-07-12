@@ -3,14 +3,22 @@ import {useState} from "react";
 import clsx from "clsx";
 import {Check, ChevronRight, Copy} from "lucide-react";
 
-import type {SchemaResponse} from "@/lib/api/client";
+import type {SchemaResponse, ValueShapeTag} from "@/lib/api/client";
 import {useSchema} from "@/lib/api/useSchema";
-import {lookupPointerTypeTag} from "@/lib/schema/typeTags";
+import {lookupPointerTypeTag, valueShapeChild, valueShapeToPointerTypeTag} from "@/lib/schema/typeTags";
 import {ScalarValue} from "@/ui/ScalarValue";
 
 interface JsonTreeProps {
   value: unknown;
   className?: string;
+  // The compiled query's own value-shape tag tree (see client.ts), sent
+  // alongside /api/query's response — resolves type tags for values that
+  // aren't a known schema pointer (a bare top-level cast, a free object's
+  // tuple field, ...), which the pointer-name-based lookup below can't
+  // reach on its own. Omit it for a context with no compiled-query shape at
+  // all (e.g. history replays of an older entry) — falls back to the
+  // pointer-name guess everywhere.
+  valueShape?: ValueShapeTag;
 }
 
 // Recursively strips __pylon_type__ before copying, so "Copy JSON" produces
@@ -32,13 +40,13 @@ const stripInternal = (value: unknown): unknown => {
 // `<uuid>`/`<std::datetime>`/`module::Enum.Member` tags resolved from real
 // schema data (see src/lib/schema/typeTags.ts) rather than guessed from the
 // value's shape.
-export const JsonTree: React.FC<JsonTreeProps> = ({value, className}) => {
+export const JsonTree: React.FC<JsonTreeProps> = ({value, className, valueShape}) => {
   const {data: schema} = useSchema();
 
   // Output
   return (
     <div className={clsx("font-mono text-sm", className)}>
-      <JsonNode value={value} schema={schema} />
+      <JsonNode value={value} schema={schema} valueShape={valueShape} />
     </div>
   );
 };
@@ -68,10 +76,27 @@ interface JsonNodeProps {
   value: unknown;
   schema: SchemaResponse | undefined;
   parentPylonType?: string;
+  valueShape?: ValueShapeTag;
 }
 
-const JsonNode: React.FC<JsonNodeProps> = ({label, value, schema, parentPylonType}) => {
+const JsonNode: React.FC<JsonNodeProps> = ({label, value, schema, parentPylonType, valueShape}) => {
   const [open, setOpen] = useState(true);
+
+  // A tuple/named-tuple value is JS-object-shaped (a dict or array) but
+  // renders as a single Gel-style literal `(x := 1, y := 2)`, not as an
+  // expandable tree node — this check must come before the generic
+  // object/array branch below, which would otherwise treat it as one.
+  if (valueShape?.kind === "namedTuple") {
+    return (
+      <div className="group/row flex items-center rounded pl-4 hover:bg-surface-hover">
+        <div className="flex-1">
+          {label !== undefined && <span className="text-[var(--syntax-name)]">{label}: </span>}
+          <ScalarValue value={value} typeTag={valueShapeToPointerTypeTag(valueShape)} schema={schema} />
+        </div>
+        <CopyButton value={value} />
+      </div>
+    );
+  }
 
   if (value !== null && typeof value === "object") {
     const isArray = Array.isArray(value);
@@ -108,6 +133,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({label, value, schema, parentPylonTyp
                 value={v}
                 schema={schema}
                 parentPylonType={pylonType ?? parentPylonType}
+                valueShape={valueShapeChild(valueShape, isArray ? "0" : k)}
               />
             ))}
             <span className="text-fg-muted">{isArray ? "]" : "}"}</span>
@@ -117,14 +143,18 @@ const JsonNode: React.FC<JsonNodeProps> = ({label, value, schema, parentPylonTyp
     );
   }
 
-  const typeTag = label !== undefined ? lookupPointerTypeTag(schema, parentPylonType, label) : null;
+  const typeTag = valueShape
+    ? valueShapeToPointerTypeTag(valueShape)
+    : label !== undefined
+      ? lookupPointerTypeTag(schema, parentPylonType, label)
+      : null;
 
   // Output
   return (
     <div className="group/row flex items-center rounded pl-4 hover:bg-surface-hover">
       <div className="flex-1">
         {label !== undefined && <span className="text-[var(--syntax-name)]">{label}: </span>}
-        <ScalarValue value={value} typeTag={typeTag} />
+        <ScalarValue value={value} typeTag={typeTag} schema={schema} />
       </div>
       <CopyButton value={value} />
     </div>

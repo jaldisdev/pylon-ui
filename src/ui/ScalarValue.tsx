@@ -1,6 +1,7 @@
 import type React from "react";
 
-import type {PointerTypeTag} from "@/lib/schema/typeTags";
+import type {SchemaResponse} from "@/lib/api/client";
+import {memberTypeTag, type PointerTypeTag} from "@/lib/schema/typeTags";
 
 interface ScalarValueProps {
   value: unknown;
@@ -10,14 +11,49 @@ interface ScalarValueProps {
   // already names the type, so repeating it per cell would just be noise.
   // JsonTree keeps the full, unabbreviated form.
   compact?: boolean;
+  // Only needed to resolve a namedTuple member's own type tag recursively
+  // (e.g. an enum or nested-tuple member) — omit it and a tuple still
+  // renders correctly, just without those members' own tags/hydration.
+  schema?: SchemaResponse;
 }
 
 // Renders one scalar value with schema-derived type tags (`<uuid>`,
 // `module::Enum.Member`) — shared by JsonTree (REPL/Query Editor results) and
 // the Data Explorer grid, so every surface renders values identically.
-export const ScalarValue: React.FC<ScalarValueProps> = ({value, typeTag, compact}) => {
+export const ScalarValue: React.FC<ScalarValueProps> = ({value, typeTag, compact, schema}) => {
   if (value === null || value === undefined) {
     return <span className="text-fg-muted">{"{}"}</span>;
+  }
+
+  if (typeTag?.kind === "namedTuple") {
+    // Gel's own tuple literal syntax: `(x := 1, y := 2)` for named members,
+    // `(1, 2)` for positional ones — never JSON braces/brackets.
+    const members = typeTag.members;
+    const positional = members.every((m) => m.name === null);
+    const memberValue = (m: (typeof members)[number], index: number): unknown =>
+      positional
+        ? Array.isArray(value)
+          ? value[index]
+          : undefined
+        : (value as Record<string, unknown> | null | undefined)?.[m.name!];
+    return (
+      <span>
+        (
+        {members.map((m, i) => (
+          <span key={m.name ?? i}>
+            {i > 0 && ", "}
+            {m.name !== null && <span className="text-[var(--syntax-name)]">{m.name} := </span>}
+            <ScalarValue
+              value={memberValue(m, i)}
+              typeTag={schema ? memberTypeTag(m, schema) : null}
+              compact={compact}
+              schema={schema}
+            />
+          </span>
+        ))}
+        )
+      </span>
+    );
   }
 
   if (typeTag?.kind === "enum" && typeof value === "string") {
