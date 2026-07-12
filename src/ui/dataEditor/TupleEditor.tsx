@@ -1,5 +1,5 @@
 import type React from "react";
-import {useState} from "react";
+import {Fragment, useState} from "react";
 import clsx from "clsx";
 
 import type {NamedTupleMember, SchemaResponse} from "@/lib/api/client";
@@ -63,12 +63,24 @@ export const TupleEditor: React.FC<TupleEditorProps> = ({members, schema, value,
     }
   };
 
+  // A CSS grid (not one flex row per member) so the label column sizes to
+  // the *widest* label across every member, and every input starts at that
+  // same x-offset with equal width — independent flex rows would each size
+  // their own label instead, leaving shorter-labeled inputs narrower and
+  // misaligned. A positional (unnamed) member has no label cell to line up
+  // with anything, so its input spans both columns instead of leaving a
+  // stray empty first cell.
   return (
-    <div className={clsx("flex flex-col gap-1.5 rounded-md p-2", depth % 2 === 1 ? "bg-surface-hover" : "bg-surface")}>
+    <div
+      className={clsx(
+        "grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1.5 rounded-md p-2",
+        depth % 2 === 1 ? "bg-surface-hover" : "bg-surface"
+      )}
+    >
       {members.map((member, index) => (
-        <div key={member.name ?? index} className="flex items-start gap-2">
-          {member.name !== null && <span className="mt-1.5 shrink-0 font-mono text-2sm text-fg-muted">{member.name} :=</span>}
-          <div className="min-w-0 flex-1">
+        <Fragment key={member.name ?? index}>
+          {member.name !== null && <span className="shrink-0 font-mono text-2sm text-fg-muted">{member.name} :=</span>}
+          <div className={clsx("min-w-0", member.name === null && "col-span-2")}>
             <MemberEditor
               member={member}
               schema={schema}
@@ -77,7 +89,7 @@ export const TupleEditor: React.FC<TupleEditorProps> = ({members, schema, value,
               depth={depth}
             />
           </div>
-        </div>
+        </Fragment>
       ))}
     </div>
   );
