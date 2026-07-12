@@ -1,12 +1,11 @@
 import type React from "react";
-import clsx from "clsx";
 
 import type {NamedTupleMember, SchemaResponse} from "@/lib/api/client";
 import type {ExtractedParam} from "@/lib/editor/lang-pyql/extractParams";
-import {Select, type SelectOption} from "@/ui/Select";
 import {defaultTupleValue, TupleEditor} from "@/ui/dataEditor/TupleEditor";
 import {ArrayEditor} from "@/ui/dataEditor/ArrayEditor";
-import {resolveArrayParamElement, resolveTupleParamMembers} from "@/features/queryEditor/tupleParamCast";
+import {ScalarMemberInput} from "@/ui/dataEditor/ScalarMemberInput";
+import {resolveArrayParamElement, resolveTupleParamMembers} from "@/lib/schema/tupleTypeCast";
 
 interface ParamsPanelProps {
   params: ExtractedParam[];
@@ -15,6 +14,11 @@ interface ParamsPanelProps {
   errors: Record<string, string | null>;
   schema: SchemaResponse | undefined;
   onChange: (name: string, raw: string) => void;
+  // Bumped whenever `values` is replaced wholesale from outside a keystroke
+  // (loading a history entry) — folded into each field's key below so it
+  // remounts and re-seeds from the new `values`, since ScalarMemberInput only
+  // reads its `value` prop once, on mount.
+  resetKey?: number;
 }
 
 // A cast's typeName is "module::Name" (or just "Name" for the default
@@ -76,7 +80,7 @@ const ArrayParamEditor: React.FC<{
 // params get a Select of the enum's members instead of free text, matching
 // Gel — clearable when the param is optional, so it can be reset to unset.
 // Only rendered when the query actually has parameters.
-export const ParamsPanel: React.FC<ParamsPanelProps> = ({params, values, errors, schema, onChange}) => {
+export const ParamsPanel: React.FC<ParamsPanelProps> = ({params, values, errors, schema, onChange, resetKey = 0}) => {
   if (params.length === 0) return null;
 
   // Output
@@ -106,43 +110,21 @@ export const ParamsPanel: React.FC<ParamsPanelProps> = ({params, values, errors,
               <span className="w-20 shrink-0 pt-2.5 font-mono text-2xs text-fg-muted">${param.name}</span>
               <div className="min-w-0 flex-1">
                 {tupleMembers && schema ? (
-                  <TupleParamEditor name={param.name} members={tupleMembers} raw={raw} schema={schema} onChange={onChange} />
+                  <TupleParamEditor key={resetKey} name={param.name} members={tupleMembers} raw={raw} schema={schema} onChange={onChange} />
                 ) : arrayElement && schema ? (
-                  <ArrayParamEditor name={param.name} element={arrayElement} raw={raw} schema={schema} onChange={onChange} />
-                ) : paramEnum ? (
-                  <Select
-                    options={paramEnum.members.map((m): SelectOption => ({value: m, label: m}))}
-                    value={raw ? {value: raw, label: raw} : null}
-                    onChange={(opt) => onChange(param.name, opt?.value ?? "")}
-                    isClearable={!param.required}
-                    isDisabled={!!param.castConflict}
-                    placeholder={param.required ? "required" : "optional"}
-                    className={invalid ? "[&>div]:border-[var(--syntax-operator)]" : undefined}
-                  />
+                  <ArrayParamEditor key={resetKey} name={param.name} element={arrayElement} raw={raw} schema={schema} onChange={onChange} />
                 ) : (
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={raw}
-                      onChange={(e) => onChange(param.name, e.target.value)}
-                      disabled={!!param.castConflict}
-                      placeholder={param.required ? "required" : "optional"}
-                      className={clsx(
-                        "h-10 w-full rounded-md border bg-surface pr-14 pl-2.5 font-mono text-sm text-fg outline-none disabled:opacity-50",
-                        invalid ? "border-[var(--syntax-operator)]" : "border-border focus:border-accent"
-                      )}
-                    />
-                    {param.castType && (
-                      <span
-                        className={clsx(
-                          "absolute top-1 right-1 rounded px-1.5 py-0.5 text-2xs font-medium",
-                          invalid ? "bg-[var(--syntax-operator)] text-white" : "bg-surface-active text-fg-muted"
-                        )}
-                      >
-                        {param.castType}
-                      </span>
-                    )}
-                  </div>
+                  <ScalarMemberInput
+                    key={resetKey}
+                    value={raw}
+                    castType={param.castType}
+                    enumOptions={paramEnum?.members ?? null}
+                    isClearable={!param.required}
+                    disabled={!!param.castConflict}
+                    placeholder={param.required ? "required" : "optional"}
+                    error={invalid ? (error ?? "") : null}
+                    onChange={(nextRaw) => onChange(param.name, nextRaw)}
+                  />
                 )}
                 {error && <div className="mt-1 text-2xs text-[var(--syntax-operator)]">{error}</div>}
               </div>

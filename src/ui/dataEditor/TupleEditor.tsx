@@ -1,10 +1,9 @@
 import type React from "react";
-import {Fragment, useState} from "react";
+import {Fragment} from "react";
 import clsx from "clsx";
 
 import type {NamedTupleMember, SchemaResponse} from "@/lib/api/client";
-import {coerceParamValue, validateCastValue} from "@/lib/editor/lang-pyql/extractParams";
-import {Select, type SelectOption} from "@/ui/Select";
+import {ScalarMemberInput} from "@/ui/dataEditor/ScalarMemberInput";
 
 // Recursive editor for a named-tuple value (nominal `@pylon.named_tuple` or
 // structural `pylon.Tuple[...]`) — one row per member, `name := <widget>`
@@ -140,79 +139,20 @@ export const MemberEditor: React.FC<{
     );
   }
 
-  if (member.kind === "enum") {
-    const [module, name] = (member.target ?? "").split("::");
-    const enumMembers = schema.enums.find((e) => e.module === module && e.name === name)?.members ?? [];
-    const options: SelectOption[] = enumMembers.map((m) => ({value: m, label: m}));
-    const current = typeof value === "string" ? (options.find((o) => o.value === value) ?? null) : null;
-    return <Select options={options} value={current} onChange={(opt) => onChange(opt?.value ?? null)} />;
-  }
-
-  if (member.typeName === "std::bool") {
-    const current = value === true ? "true" : value === false ? "false" : null;
-    return (
-      <div className="flex gap-1">
-        {(["true", "false"] as const).map((v) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => onChange(v === "true")}
-            className={clsx(
-              "rounded px-2 py-1 text-2sm",
-              current === v ? "bg-accent text-accent-fg" : "bg-surface-hover text-fg-muted hover:text-fg"
-            )}
-          >
-            {v}
-          </button>
-        ))}
-      </div>
-    );
-  }
-
-  return <ScalarMemberInput value={value} castType={member.typeName ?? null} onChange={onChange} />;
-};
-
-// Locally-controlled text input for a plain scalar member — mirrors the
-// top-level cell editor's TextEditor, but pushes a value up on every
-// keystroke instead of on commit (the whole tuple commits atomically, once,
-// when its popover closes). Keeps its own `raw` state so the displayed text
-// never fights a round trip through the parent's assembled value. Shows the
-// same floating cast-type corner tag as the Query Editor's param inputs
-// (ParamsPanel.tsx), for a consistent "what type does this expect" cue.
-const ScalarMemberInput: React.FC<{value: unknown; castType: string | null; onChange: (value: unknown) => void}> = ({
-  value,
-  castType,
-  onChange,
-}) => {
-  const [raw, setRaw] = useState(() => (value === null || value === undefined ? "" : String(value)));
-  const error = validateCastValue(raw, castType);
+  const enumOptions =
+    member.kind === "enum"
+      ? (() => {
+          const [module, name] = (member.target ?? "").split("::");
+          return schema.enums.find((e) => e.module === module && e.name === name)?.members ?? [];
+        })()
+      : null;
 
   return (
-    <div className="relative">
-      <input
-        type="text"
-        value={raw}
-        onChange={(e) => {
-          const next = e.target.value;
-          setRaw(next);
-          const nextError = validateCastValue(next, castType);
-          onChange(nextError ? next : coerceParamValue(next, castType));
-        }}
-        className={clsx(
-          "h-10 w-full rounded-md border bg-surface pr-14 pl-2.5 font-mono text-sm text-fg outline-none",
-          error ? "border-[var(--syntax-operator)]" : "border-border focus:border-accent"
-        )}
-      />
-      {castType && (
-        <span
-          className={clsx(
-            "absolute top-1 right-1 rounded px-1.5 py-0.5 text-2xs font-medium",
-            error ? "bg-[var(--syntax-operator)] text-white" : "bg-surface-active text-fg-muted"
-          )}
-        >
-          {castType}
-        </span>
-      )}
-    </div>
+    <ScalarMemberInput
+      value={value}
+      castType={member.typeName ?? null}
+      enumOptions={enumOptions}
+      onChange={(_raw, coerced, valid) => onChange(valid ? coerced : _raw)}
+    />
   );
 };

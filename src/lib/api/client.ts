@@ -141,8 +141,18 @@ export const api = {
     request<QueryResponse>("/query", {
       method: "POST",
       // Session globals (configured via the top bar's globals modal) apply
-      // to every query automatically — callers never need to pass them.
-      body: JSON.stringify({pyql, params, globals: useGlobalsStore.getState().values}),
+      // to every query automatically — callers never need to pass them. Only
+      // toggled-on globals are sent; a disabled one stays stored client-side
+      // but is excluded here.
+      body: JSON.stringify({
+        pyql,
+        params,
+        globals: Object.fromEntries(
+          Object.entries(useGlobalsStore.getState().entries)
+            .filter(([, entry]) => entry.enabled)
+            .map(([key, entry]) => [key, entry.value])
+        ),
+      }),
       signal,
     }),
   runAiChat: (body: AiChatRequest, signal?: AbortSignal) =>

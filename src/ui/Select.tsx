@@ -22,6 +22,15 @@ export const Select: React.FC<Props> = (props) => (
     // clipped by it — z-index alone can't fix that, only escaping the
     // ancestor's overflow box can.
     menuPortalTarget={document.body}
+    // `unstyled` only strips react-select's default *visual* styling
+    // (colors/padding/etc, driven by classNames below) — it still computes
+    // its own inline `style` for the portal wrapper (position/top/left plus
+    // a baked-in `zIndex: 1`), and an inline style always wins over a class
+    // regardless of specificity or source order. A `menuPortal` className
+    // alone (e.g. a z-60 Tailwind utility) can therefore never lift the menu
+    // above Modal.tsx's z-50 backdrop — only overriding the style object
+    // itself does.
+    styles={{menuPortal: (base) => ({...base, zIndex: 60})}}
     classNames={{
       control: ({isFocused, isDisabled}) =>
         clsx(
@@ -34,7 +43,6 @@ export const Select: React.FC<Props> = (props) => (
       input: () => "text-fg",
       indicatorSeparator: () => "hidden",
       dropdownIndicator: () => "text-fg-muted px-1",
-      menuPortal: () => "z-50",
       menu: () => "mt-1 rounded-md border border-border bg-surface shadow-[var(--shadow-card)] overflow-hidden",
       menuList: () => "p-1 max-h-60",
       option: ({isFocused, isSelected}) =>

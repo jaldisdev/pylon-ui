@@ -1,6 +1,5 @@
 import type React from "react";
-import {useEffect, useRef, useState} from "react";
-import clsx from "clsx";
+import {useEffect, useRef} from "react";
 
 import type {SchemaPointer, SchemaResponse} from "@/lib/api/client";
 import {coerceParamValue, validateCastValue} from "@/lib/editor/lang-pyql/extractParams";
@@ -9,6 +8,7 @@ import {Select, type SelectOption} from "@/ui/Select";
 import {resolveTupleMembers} from "@/ui/dataEditor/TupleEditor";
 import {TuplePopover} from "@/ui/dataEditor/TuplePopover";
 import {ArrayPopover} from "@/ui/dataEditor/ArrayPopover";
+import {ScalarMemberInput} from "@/ui/dataEditor/ScalarMemberInput";
 
 // Inline per-scalar-type cell editor, mounted in place of a grid cell on
 // double-click — mirrors gel-ui's dataEditor component library
@@ -156,27 +156,15 @@ const EnumEditor: React.FC<{
   );
 };
 
-const BoolEditor: React.FC<{initialValue: unknown; onCommit: (value: EditValue) => void}> = ({initialValue, onCommit}) => {
-  const current = initialValue === true ? "true" : initialValue === false ? "false" : null;
-  return (
-    <div className="flex gap-1">
-      {(["true", "false"] as const).map((v) => (
-        <button
-          key={v}
-          type="button"
-          autoFocus={v === "true"}
-          onClick={() => onCommit({valid: true, value: v === "true"})}
-          className={clsx(
-            "rounded px-2 py-1 text-2sm",
-            current === v ? "bg-accent text-accent-fg" : "bg-surface-hover text-fg-muted hover:text-fg"
-          )}
-        >
-          {v}
-        </button>
-      ))}
-    </div>
-  );
-};
+const BoolEditor: React.FC<{initialValue: unknown; onCommit: (value: EditValue) => void}> = ({initialValue, onCommit}) => (
+  <ScalarMemberInput
+    dense
+    autoFocus
+    value={initialValue}
+    castType="std::bool"
+    onChange={(_raw, coerced) => onCommit({valid: true, value: coerced})}
+  />
+);
 
 const TextEditor: React.FC<{
   pointer: SchemaPointer;
@@ -185,29 +173,25 @@ const TextEditor: React.FC<{
   squareRight?: boolean;
 }> = ({pointer, initialValue, onCommit, squareRight}) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [raw, setRaw] = useState(() => valueToRawText(initialValue));
-  const rawRef = useRef(raw);
-  rawRef.current = raw;
-  const committedRef = useRef(false);
-
   const castType = pointer.typeName ?? null;
-  const error = validateCastValue(raw, castType);
   const isMultiline = castType === "std::str" || castType === "std::json";
+  const latestRef = useRef<EditValue>(toEditValue(valueToRawText(initialValue), castType));
+  const committedRef = useRef(false);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (!containerRef.current || containerRef.current.contains(e.target as Node) || committedRef.current) return;
       committedRef.current = true;
-      onCommit(toEditValue(rawRef.current, castType));
+      onCommit(latestRef.current);
     };
     document.addEventListener("mousedown", handler, true);
     return () => document.removeEventListener("mousedown", handler, true);
-  }, [castType, onCommit]);
+  }, [onCommit]);
 
   const commit = () => {
     if (committedRef.current) return;
     committedRef.current = true;
-    onCommit(toEditValue(raw, castType));
+    onCommit(latestRef.current);
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -217,26 +201,20 @@ const TextEditor: React.FC<{
     }
   };
 
-  const inputClassName = clsx(
-    "h-full w-full rounded bg-surface px-1.5 py-1 font-mono text-2sm outline-none",
-    squareRight ? "rounded-r-none border border-r-0" : "border",
-    error ? "border-red-500" : "border-border focus:border-accent"
-  );
-
   return (
     <div ref={containerRef} className="h-full">
-      {isMultiline ? (
-        <textarea
-          autoFocus
-          value={raw}
-          onChange={(e) => setRaw(e.target.value)}
-          onKeyDown={onKeyDown}
-          rows={Math.min(6, Math.max(1, raw.split("\n").length))}
-          className={clsx(inputClassName, "resize-none")}
-        />
-      ) : (
-        <input autoFocus type="text" value={raw} onChange={(e) => setRaw(e.target.value)} onKeyDown={onKeyDown} className={inputClassName} />
-      )}
+      <ScalarMemberInput
+        dense
+        autoFocus
+        value={initialValue}
+        castType={castType}
+        multiline={isMultiline}
+        squareRight={squareRight}
+        onKeyDown={onKeyDown}
+        onChange={(raw, coerced, valid) => {
+          latestRef.current = valid ? {valid: true, value: coerced} : {valid: false, raw, error: validateCastValue(raw, castType) ?? ""};
+        }}
+      />
     </div>
   );
 };

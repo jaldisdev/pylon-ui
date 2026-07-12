@@ -17,7 +17,7 @@ import {IconToggle} from "@/ui/IconToggle";
 import {HistoryPanel, type HistoryEntry} from "@/features/queryEditor/HistoryPanel";
 import {ParamsPanel} from "@/features/queryEditor/ParamsPanel";
 import {ResultPanel, type QueryResult} from "@/features/queryEditor/ResultPanel";
-import {resolveArrayParamElement, resolveTupleParamMembers} from "@/features/queryEditor/tupleParamCast";
+import {resolveArrayParamElement, resolveTupleParamMembers} from "@/lib/schema/tupleTypeCast";
 import {defaultTupleValue} from "@/ui/dataEditor/TupleEditor";
 
 type Orientation = "horizontal" | "vertical";
@@ -50,6 +50,7 @@ export const QueryEditorTab: React.FC = () => {
   const [queryText, setQueryText] = useSessionStorageState(DRAFT_TEXT_KEY, "");
   const [paramValues, setParamValues] = useSessionStorageState<Record<string, string>>(DRAFT_PARAMS_KEY, {});
   const [orientation, setOrientation] = useState<Orientation>("horizontal");
+  const [paramsResetKey, setParamsResetKey] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useLocalStorageState<HistoryEntry[]>(HISTORY_STORAGE_KEY, []);
 
@@ -179,6 +180,7 @@ export const QueryEditorTab: React.FC = () => {
     // Fallbacks guard against entries persisted before result/param caching
     // was added — localStorage may still hold those from an earlier session.
     setParamValues(entry.paramValues ?? {});
+    setParamsResetKey((k) => k + 1);
     setResult(entry.result ?? null);
     setError(entry.error ?? null);
     setLastRunQueryText(entry.pyql);
@@ -281,6 +283,7 @@ export const QueryEditorTab: React.FC = () => {
               errors={paramErrors}
               schema={schema}
               onChange={(name, raw) => setParamValues((v) => ({...v, [name]: raw}))}
+              resetKey={paramsResetKey}
             />
           </Panel>
           <Separator
