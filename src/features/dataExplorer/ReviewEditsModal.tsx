@@ -4,8 +4,8 @@ import {useQueryClient} from "@tanstack/react-query";
 
 import {api} from "@/lib/api/client";
 import {useSchema} from "@/lib/api/useSchema";
-import {useTheme} from "@/lib/theme/useTheme";
-import {CodeEditor} from "@/lib/editor/CodeEditor";
+import {CodeBlock, type Range} from "@/lib/editor/CodeBlock";
+import {getAllChildren} from "@/lib/editor/lang-pyql/syntaxTree";
 import {ConfirmButton} from "@/ui/ConfirmButton";
 import {Modal} from "@/ui/Modal";
 import {ScalarValue} from "@/ui/ScalarValue";
@@ -18,14 +18,13 @@ interface ReviewEditsModalProps {
 
 // Shows every pending edit as the real generated PyQL it'll run — confirm
 // (executes the single combined query and clears all edits) or withdraw
-// (discards everything) — matching gel-ui's Review Changes modal. Unlike
-// gel-ui, params are shown as a separate list below each statement rather
-// than substituted inline into the code block (that needs walking decoration
-// widgets into a live CodeMirror view — a fair v1 simplification, not a
-// silent drop: the same information is present, just laid out differently).
+// (discards everything), matching gel-ui's Review Changes modal. Like
+// gel-ui, each `<type>$paramName` reference is decorated in place with its
+// real resolved value instead of showing the raw placeholder — the query
+// still executes with real bound params underneath (see api.runQuery below),
+// this is purely a display substitution over the syntax-highlighted code.
 export const ReviewEditsModal: React.FC<ReviewEditsModalProps> = ({onClose}) => {
   const {data: schema} = useSchema();
-  const {resolvedTheme} = useTheme();
   const queryClient = useQueryClient();
 
   const propertyEdits = useDataEditsStore((s) => s.propertyEdits);
@@ -38,8 +37,7 @@ export const ReviewEditsModal: React.FC<ReviewEditsModalProps> = ({onClose}) => 
   const [commitError, setCommitError] = useState<string | null>(null);
 
   // Recomputed on every render (any edit-map change re-renders this
-  // component, since each is its own store subscription above) — the plain-
-  // React equivalent of gel-ui's MobX-observer-driven live recomputation.
+  // component, since each is its own store subscription above).
   const generated = useMemo(
     () => (schema ? generateStatements({propertyEdits, linkEdits, insertEdits, deleteEdits}, schema) : null),
     [propertyEdits, linkEdits, insertEdits, deleteEdits, schema]
@@ -74,39 +72,73 @@ export const ReviewEditsModal: React.FC<ReviewEditsModalProps> = ({onClose}) => 
 
   // Output
   return (
-    <Modal title="Review Changes" onClose={onClose}>
+    <Modal title="Review Changes" onClose={onClose} size="lg">
       <div className="flex flex-col gap-3">
         {generated.error && <div className="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-500">{generated.error}</div>}
 
         {generated.statements.map((statement) => (
           <div key={statement.varName} className="flex flex-col gap-1">
             <div className="font-mono text-xs text-fg-muted">{statement.varName} :=</div>
-            <CodeEditor
-              key={`${statement.varName}:${statement.code}`}
-              defaultValue={statement.code}
-              dark={resolvedTheme === "dark"}
-              readOnly
-              className="rounded-md border border-border text-xs"
-            />
+            {/* The modal itself grows to fit this (see size="lg" above), but
+                caps out at a viewport-relative max width — this scrolls
+                horizontally instead of wrapping mid-pill once content
+                exceeds that cap (e.g. on a narrow/mobile viewport). */}
+            <div className="overflow-x-auto rounded-md border border-border bg-surface px-3 py-2">
+              <CodeBlock
+                code={statement.code}
+                className="m-0 whitespace-pre font-mono text-xs"
+                customRanges={(tree) =>
+                getAllChildren(tree.topNode, "QueryParameter").map((node) => {
+                  const range: Range = [node.from, node.to];
+                  return {
+                    range,
+                    renderer: (_range, content) => {
+                      const paramName = statement.code.slice(node.from, node.to).split("$")[1];
+                      const value = generated.params[paramName];
+                      const typeTag = generated.paramTypeTags[paramName] ?? null;
+                      // Drop the last highlighted child — the `$paramName`
+                      // text itself — keeping only the cast-bracket prefix
+                      // (e.g. `<int64>`), then append the real value in its
+                      // place.
+                      const rawChildren = content.props.children;
+                      const children = Array.isArray(rawChildren) ? rawChildren.slice(0, -1) : [];
+                      // The source text's own cast (e.g. `<uuid>`, `<default::Gender>`)
+                      // sits right before this value, so a scalar's `<tag>` here
+                      // would just repeat it — drop it by nulling the tag out
+                      // entirely. Only `compact` for enums, which purely
+                      // suppresses that same redundant prefix; never for
+                      // namedTuple, since `compact` also strips string quotes
+                      // and that propagates to every nested member (a tuple's
+                      // own member types aren't shown anywhere else, so their
+                      // tags/quotes must stay intact).
+                      const displayTypeTag = typeTag?.kind === "scalar" ? null : typeTag;
+                      // Two-tone pill matching gel-ui's Review Changes look:
+                      // the cast prefix sits on a muted capsule, the resolved
+                      // value on a lighter inset segment butted up against it.
+                      return (
+                        <span className="inline-flex h-[22px] items-center overflow-hidden rounded-full bg-surface-active pl-1.5 align-middle">
+                          <span className="whitespace-pre">{children}</span>
+                          <span className="ml-1.5 flex h-full items-center bg-header px-1.5 font-semibold text-fg">
+                            <ScalarValue
+                              value={value}
+                              typeTag={displayTypeTag}
+                              compact={typeTag?.kind === "enum"}
+                              schema={schema}
+                            />
+                          </span>
+                        </span>
+                      );
+                    },
+                  };
+                })
+                }
+              />
+            </div>
             {statement.error && <div className="text-xs text-red-500">{statement.error}</div>}
           </div>
         ))}
 
         {generated.statements.length === 0 && <div className="text-sm text-fg-muted">Nothing pending.</div>}
-
-        {Object.keys(generated.params).length > 0 && (
-          <div className="rounded-md border border-border p-2">
-            <div className="mb-1 text-2xs tracking-wide text-fg-muted uppercase">Parameters</div>
-            <div className="flex flex-col gap-0.5 font-mono text-xs">
-              {Object.entries(generated.params).map(([name, value]) => (
-                <div key={name} className="flex gap-2">
-                  <span className="text-fg-muted">${name} =</span>
-                  <ScalarValue value={value} typeTag={null} compact />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {commitError && <div className="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-500">{commitError}</div>}
 

@@ -1,4 +1,5 @@
 import type {NamedTupleMember, SchemaPointer, SchemaResponse, SchemaType} from "@/lib/api/client";
+import {pointerTypeTag, UUID_TYPE_TAG, type PointerTypeTag} from "@/lib/schema/typeTags";
 import type {DeleteObjectEdit, EditValue, InsertObjectEdit, UpdateLinkEdit, UpdatePropertyEdit} from "./editsStore";
 
 // Ports gel-ui's generateStatements() (shared/studio/tabs/dataview/state/edits.ts)
@@ -30,6 +31,10 @@ export interface GeneratedStatement {
 export interface GeneratedEdits {
   statements: GeneratedStatement[];
   params: Record<string, unknown>; // "pN" -> bound value, referenced in code as <type>$pN
+  // "pN" -> the same type tag ScalarValue already renders elsewhere — lets the
+  // Review Changes modal show each inlined param value with real formatting
+  // (enum labels, tuple literals, etc.) instead of a plain JSON stringify.
+  paramTypeTags: Record<string, PointerTypeTag | null>;
   finalQuery: string | null; // the full `with ... select {...}` wrapper, or null if nothing pending
   error?: string; // top-level error (e.g. a cyclic dependency between pending inserts)
 }
@@ -46,11 +51,13 @@ export interface EditsSnapshot {
 
 class ParamAllocator {
   params: Record<string, unknown> = {};
+  typeTags: Record<string, PointerTypeTag | null> = {};
   private counter = 0;
 
-  add(value: unknown): string {
+  add(value: unknown, typeTag: PointerTypeTag | null): string {
     const name = `p${this.counter++}`;
     this.params[name] = value;
+    this.typeTags[name] = typeTag;
     return name;
   }
 }
@@ -142,7 +149,7 @@ const buildLinkExpr = (
         error = `invalid value for link property '${tp.name}': ${value.error}`;
         continue;
       }
-      assignments.push(`@${tp.name} := <${castTypeFor(tp)}>$${alloc.add(value.value)}`);
+      assignments.push(`@${tp.name} := <${castTypeFor(tp)}>$${alloc.add(value.value, pointerTypeTag(tp, schema))}`);
     }
     return assignments.length > 0 ? ` { ${assignments.join(", ")} }` : "";
   };
@@ -154,10 +161,10 @@ const buildLinkExpr = (
     if (change.kind === "add") {
       if (deletedIds.has(change.id)) continue; // can't link to something also being deleted this batch
       if (throughPointers && change.properties && Object.keys(change.properties).length > 0) {
-        const idParam = alloc.add(change.id);
+        const idParam = alloc.add(change.id, UUID_TYPE_TAG);
         shapedAddParts.push(`(select ${targetType} filter .id = <uuid>$${idParam})${shapeFor(change.properties)}`);
       } else {
-        batchAddConds.push(`.id = <uuid>$${alloc.add(change.id)}`);
+        batchAddConds.push(`.id = <uuid>$${alloc.add(change.id, UUID_TYPE_TAG)}`);
       }
     } else {
       removeIds.push(change.id);
@@ -185,7 +192,7 @@ const buildLinkExpr = (
   if (hasAdds && !hasRemoves) return {parts: [{op: "+=", expr: addExprParts.join(" union ")}], error};
 
   if (hasRemoves && !hasAdds) {
-    const removeConds = removeIds.map((id) => `.id = <uuid>$${alloc.add(id)}`).join(" or ");
+    const removeConds = removeIds.map((id) => `.id = <uuid>$${alloc.add(id, UUID_TYPE_TAG)}`).join(" or ");
     return {parts: [{op: "-=", expr: `(select ${targetType} filter ${removeConds})`}], error};
   }
 
@@ -197,7 +204,7 @@ const buildLinkExpr = (
   // one pointer in the same SET clause compiles and executes correctly,
   // since each becomes its own independent junction CTE sharing the same
   // row source).
-  const removeConds = removeIds.map((id) => `.id = <uuid>$${alloc.add(id)}`).join(" or ");
+  const removeConds = removeIds.map((id) => `.id = <uuid>$${alloc.add(id, UUID_TYPE_TAG)}`).join(" or ");
   return {
     parts: [
       {op: "+=", expr: addExprParts.join(" union ")},
@@ -270,7 +277,7 @@ const buildInsertStatement = (
         error = `invalid value for '${pointer.name}': ${value.error}`;
         continue;
       }
-      lines.push(`${pointer.name} := <${castTypeFor(pointer)}>$${alloc.add(value.value)}`);
+      lines.push(`${pointer.name} := <${castTypeFor(pointer)}>$${alloc.add(value.value, pointerTypeTag(pointer, schema))}`);
       continue;
     }
 
@@ -290,7 +297,7 @@ const buildInsertStatement = (
     }
   }
 
-  const body = lines.length > 0 ? ` {\n    ${lines.join(",\n    ")}\n  }` : "";
+  const body = lines.length > 0 ? ` {\n    ${lines.join(",\n    ")}\n}` : "";
   return {varName, code: `insert ${insert.objectTypeName}${body}`, error};
 };
 
@@ -330,7 +337,8 @@ const buildUpdateStatements = (
       }
       const pointer = type?.pointers.find((p) => p.name === edit.pointerName);
       const castType = pointer ? castTypeFor(pointer) : "str";
-      lines.push(`${edit.pointerName} := <${castType}>$${alloc.add(edit.value.value)}`);
+      const typeTag = pointer ? pointerTypeTag(pointer, schema) : null;
+      lines.push(`${edit.pointerName} := <${castType}>$${alloc.add(edit.value.value, typeTag)}`);
     }
 
     for (const edit of linkEditsByObjectId.get(objectId) ?? []) {
@@ -343,8 +351,8 @@ const buildUpdateStatements = (
       }
     }
 
-    const idParam = alloc.add(objectId);
-    const body = lines.length > 0 ? ` {\n    ${lines.join(",\n    ")}\n  }` : " {}";
+    const idParam = alloc.add(objectId, UUID_TYPE_TAG);
+    const body = lines.length > 0 ? ` {\n    ${lines.join(",\n    ")}\n}` : " {}";
     statements.push({varName, code: `update ${group.objectTypeName}\nfilter .id = <uuid>$${idParam}\nset${body}`, error});
   }
   return statements;
@@ -354,7 +362,7 @@ const buildDeleteStatements = (edits: EditsSnapshot, alloc: ParamAllocator): Gen
   let i = 0;
   return Array.from(edits.deleteEdits.values(), (del) => {
     const varName = `delete${i++}`;
-    const idParam = alloc.add(del.objectId);
+    const idParam = alloc.add(del.objectId, UUID_TYPE_TAG);
     return {varName, code: `delete ${del.objectTypeName} filter .id = <uuid>$${idParam}`};
   });
 };
@@ -376,7 +384,7 @@ export function generateStatements(edits: EditsSnapshot, schema: SchemaResponse)
   try {
     sortedInserts = topoSortInserts(insertList, linkEditsByObjectId);
   } catch (e) {
-    return {statements: [], params: {}, finalQuery: null, error: e instanceof Error ? e.message : String(e)};
+    return {statements: [], params: {}, paramTypeTags: {}, finalQuery: null, error: e instanceof Error ? e.message : String(e)};
   }
 
   const insertVarNames = new Map<number, string>();
@@ -391,5 +399,5 @@ export function generateStatements(edits: EditsSnapshot, schema: SchemaResponse)
   const statements = [...insertStatements, ...updateStatements, ...deleteStatements];
   const finalQuery = statements.length > 0 ? buildFinalQuery(statements) : null;
 
-  return {statements, params: alloc.params, finalQuery};
+  return {statements, params: alloc.params, paramTypeTags: alloc.typeTags, finalQuery};
 }

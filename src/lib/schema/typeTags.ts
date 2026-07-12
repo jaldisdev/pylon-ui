@@ -23,6 +23,31 @@ const TAG_BY_TYPE_NAME: Record<string, string> = {
   "std::duration": "std::duration",
 };
 
+// A schema pointer's own type tag — factored out of lookupPointerTypeTag so
+// call sites that already have the resolved SchemaPointer in hand (e.g.
+// generateStatements.ts building a param's display tag) don't need to
+// re-look it up by object-type + pointer name.
+export const pointerTypeTag = (
+  pointer: {kind: string; target?: string; typeName?: string; members?: NamedTupleMember[]},
+  schema: SchemaResponse
+): PointerTypeTag | null => {
+  if (pointer.kind === "enum" && pointer.target) {
+    const [enumModule, enumName] = pointer.target.split("::");
+    return {kind: "enum", module: enumModule, name: enumName};
+  }
+
+  if (pointer.kind === "namedTuple") {
+    return {kind: "namedTuple", members: resolveTupleMembers(pointer, schema)};
+  }
+
+  const tag = pointer.typeName ? TAG_BY_TYPE_NAME[pointer.typeName] : undefined;
+  return tag ? {kind: "scalar", tag} : null;
+};
+
+// Every object id is a plain std::uuid — used to tag id-only params
+// (delete/link filters) that have no SchemaPointer of their own to look up.
+export const UUID_TYPE_TAG: PointerTypeTag = {kind: "scalar", tag: "uuid"};
+
 export const lookupPointerTypeTag = (
   schema: SchemaResponse | undefined,
   pylonType: string | undefined,
@@ -35,17 +60,7 @@ export const lookupPointerTypeTag = (
   const pointer = type?.pointers.find((p) => p.name === pointerName);
   if (!pointer) return null;
 
-  if (pointer.kind === "enum" && pointer.target) {
-    const [enumModule, enumName] = pointer.target.split("::");
-    return {kind: "enum", module: enumModule, name: enumName};
-  }
-
-  if (pointer.kind === "namedTuple") {
-    return {kind: "namedTuple", members: resolveTupleMembers(pointer, schema)};
-  }
-
-  const tag = pointer.typeName ? TAG_BY_TYPE_NAME[pointer.typeName] : undefined;
-  return tag ? {kind: "scalar", tag} : null;
+  return pointerTypeTag(pointer, schema);
 };
 
 // Same member-shape lookup as lookupPointerTypeTag, but for a member *within*
