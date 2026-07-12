@@ -1,6 +1,6 @@
 import type React from "react";
 import {useEffect, useMemo, useState} from "react";
-import {useNavigate} from "react-router-dom";
+import {useNavigate, useParams} from "react-router-dom";
 import {useQuery} from "@tanstack/react-query";
 import {ArrowLeft, Filter, Link2, RefreshCw} from "lucide-react";
 import clsx from "clsx";
@@ -36,6 +36,7 @@ const buildShape = (pointers: {name: string; kind: string}[]) =>
 // sort/filter state resets between levels instead of needing manual resets.
 export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePath, hasPendingEdits, onOpenReview}) => {
   const navigate = useNavigate();
+  const {branch} = useParams();
   const {data: schema} = useSchema();
   const {resolvedTheme} = useTheme();
 
@@ -119,7 +120,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
   }, [pointers, sortField, sortDir, filterExpr, current, linkEditModeOn, isInsertParent]);
 
   const dataQuery = useQuery({
-    queryKey: ["dataExplorer", "objects", current, sortField, sortDir, filterExpr, linkEditModeOn],
+    queryKey: ["dataExplorer", "objects", branch, current, sortField, sortDir, filterExpr, linkEditModeOn],
     queryFn: async () => {
       const res = await api.runQuery(query!.pyql, query!.params);
       if (!query!.extractField) return res.objects as Row[];
@@ -136,7 +137,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
   // simplification, see the plan); root views and edit-links mode (which is
   // really just a root view of the target type) get a real count via count().
   const countQuery = useQuery({
-    queryKey: ["dataExplorer", "count", current.pylonType, filterExpr],
+    queryKey: ["dataExplorer", "count", branch, current.pylonType, filterExpr],
     queryFn: async () => {
       const filterClause = filterExpr ? ` filter ${filterExpr}` : "";
       const res = await api.runQuery(`select count((select ${current.pylonType}${filterClause}))`);
@@ -150,7 +151,14 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
   // checkbox/radio starting state. A pending insert row never has anything
   // linked on the server yet, so this is skipped entirely for it.
   const linkedIdsQuery = useQuery({
-    queryKey: ["dataExplorer", "linkedIds", current.parent?.parentType, current.parent?.id, current.parent?.fieldName],
+    queryKey: [
+      "dataExplorer",
+      "linkedIds",
+      branch,
+      current.parent?.parentType,
+      current.parent?.id,
+      current.parent?.fieldName,
+    ],
     queryFn: async () => {
       const parent = current.parent!;
       const res = await api.runQuery(`select ${parent.parentType} { ${parent.fieldName}: {id} } filter .id = <uuid>$parentId`, {

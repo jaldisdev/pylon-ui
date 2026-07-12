@@ -22,7 +22,7 @@ export type Range = [number, number];
 
 export type CustomRange = {range: Range} & (
   | {style?: string}
-  | {renderer: (range: Range, content: React.ReactElement) => React.ReactElement}
+  | {renderer: (range: Range, content: React.ReactElement<{children?: React.ReactNode}>) => React.ReactElement}
 );
 
 export interface CodeBlockProps {

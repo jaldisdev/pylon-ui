@@ -14,7 +14,14 @@ export class ApiError extends Error {
   }
 }
 
-const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
+// Every tab is nested under /:branch/<tab> (see App.tsx's route table), so
+// the current URL's first path segment is always the selected connection —
+// read directly here instead of threading it through every api.* call site.
+// Falls back to "main" (the frontend's own name for the base [database]
+// block) for the rare case this runs before the router has mounted at all.
+const currentConnection = (): string => window.location.pathname.split("/")[1] || "main";
+
+const doFetch = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const res = await fetch(`/api${path}`, {
     ...init,
     headers: {
@@ -40,6 +47,19 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
 
   return res.json() as Promise<T>;
 };
+
+// Process-level routes (schema/globals/connections/models) are derived from
+// pylon.finalize()'s schema-dir scan or the TOML config itself, never from a
+// live DB round trip — identical regardless of which connection is
+// selected, so they're never prefixed.
+const request = <T>(path: string, init?: RequestInit): Promise<T> => doFetch<T>(path, init);
+
+// Routes that actually read/write database data (query/stats/ai-chat) are
+// addressed as /api/<connection>/<path>, matching the backend's
+// _split_connection_path (pylon/server/asgi.py) and the frontend's own
+// /<branch>/... URL scheme.
+const connectionRequest = <T>(path: string, init?: RequestInit): Promise<T> =>
+  doFetch<T>(`/${currentConnection()}${path}`, init);
 
 // A position-free "value shape" tag tree, aligned with the already-decoded
 // JSON in QueryResponse.objects (not the compiler's position-based
@@ -136,9 +156,9 @@ export const api = {
   getConnections: () => request<ConnectionsResponse>("/connections"),
   getModels: () => request<ModelsResponse>("/models"),
   getGlobals: () => request<GlobalsResponse>("/globals"),
-  getStats: () => request<StatsResponse>("/stats"),
+  getStats: () => connectionRequest<StatsResponse>("/stats"),
   runQuery: (pyql: string, params?: Record<string, unknown>, signal?: AbortSignal) =>
-    request<QueryResponse>("/query", {
+    connectionRequest<QueryResponse>("/query", {
       method: "POST",
       // Session globals (configured via the top bar's globals modal) apply
       // to every query automatically — callers never need to pass them. Only
@@ -156,7 +176,7 @@ export const api = {
       signal,
     }),
   runAiChat: (body: AiChatRequest, signal?: AbortSignal) =>
-    request<AiChatResponse>("/ai/chat", {
+    connectionRequest<AiChatResponse>("/ai/chat", {
       method: "POST",
       body: JSON.stringify(body),
       signal,
