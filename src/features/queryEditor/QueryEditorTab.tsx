@@ -17,7 +17,7 @@ import {IconToggle} from "@/ui/IconToggle";
 import {HistoryPanel, type HistoryEntry} from "@/features/queryEditor/HistoryPanel";
 import {ParamsPanel} from "@/features/queryEditor/ParamsPanel";
 import {ResultPanel, type QueryResult} from "@/features/queryEditor/ResultPanel";
-import {resolveTupleParamMembers} from "@/features/queryEditor/tupleParamCast";
+import {resolveArrayParamElement, resolveTupleParamMembers} from "@/features/queryEditor/tupleParamCast";
 import {defaultTupleValue} from "@/ui/dataEditor/TupleEditor";
 
 type Orientation = "horizontal" | "vertical";
@@ -74,10 +74,14 @@ export const QueryEditorTab: React.FC = () => {
     params.some(
       (p) =>
         p.castConflict !== null ||
-        // A tuple param always has a fully-populated default draft (see
-        // ParamsPanel's TupleParamEditor) — it's never "missing" the way a
+        // A tuple/array param always has a valid default draft (a
+        // fully-populated tuple, or an empty array — see ParamsPanel's
+        // TupleParamEditor/ArrayParamEditor) — never "missing" the way a
         // blank scalar input is.
-        (p.required && !resolveTupleParamMembers(p.castType, schema) && !paramValues[p.name]?.trim())
+        (p.required &&
+          !resolveTupleParamMembers(p.castType, schema) &&
+          !resolveArrayParamElement(p.castType, schema) &&
+          !paramValues[p.name]?.trim())
     );
   const isOutdated = result !== null && lastRunQueryText !== null && queryText !== lastRunQueryText;
   const canRun = queryText.trim().length > 0 && !hasParamErrors;
@@ -105,6 +109,15 @@ export const QueryEditorTab: React.FC = () => {
                   return [p.name, raw ? JSON.parse(raw) : defaultTupleValue(tupleMembers, schema!)];
                 } catch {
                   return [p.name, defaultTupleValue(tupleMembers, schema!)];
+                }
+              }
+              const arrayElement = resolveArrayParamElement(p.castType, schema);
+              if (arrayElement) {
+                try {
+                  const parsed = raw ? JSON.parse(raw) : [];
+                  return [p.name, Array.isArray(parsed) ? parsed : []];
+                } catch {
+                  return [p.name, []];
                 }
               }
               return [p.name, coerceParamValue(raw, p.castType)];

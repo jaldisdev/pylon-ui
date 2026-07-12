@@ -67,28 +67,43 @@ const findType = (schema: SchemaResponse, qualname: string): SchemaType | undefi
   return schema.types.find((t) => t.module === module && t.name === name);
 };
 
+// The cast type text for one member/element's own type — a nominal
+// namedTuple member's own qualified name ({target}), or a reconstructed
+// `tuple<...>`/`array<...>` for a structural one, recursing for nesting
+// (an array element can't itself be another array — see NamedTupleMember's
+// kind union — so this only ever recurses through namedTuple). Mirrors how
+// an enum pointer already casts to its own qualified name
+// (`<default::Gender>`) rather than a generic escape hatch.
+const elementCastText = (m: NamedTupleMember): string =>
+  m.kind === "namedTuple" ? tupleCastText(m) : m.kind === "enum" ? m.target! : (m.typeName ?? "str");
+
 // The cast text for one named-tuple member/pointer's own type — the target
 // type's qualified name for a nominal member ({target}), or the reconstructed
-// `tuple<...>` text for a structural one ({members}), recursing for a nested
-// tuple member. Mirrors how an enum pointer already casts to its own
-// qualified name (`<default::Gender>`) rather than a generic escape hatch.
+// `tuple<...>` text for a structural one ({members}).
 const tupleCastText = (node: {target?: string; members?: NamedTupleMember[]}): string => {
   if (node.target) return node.target;
   const members = node.members ?? [];
   const positional = members.every((m) => m.name === null);
-  const elementText = (m: NamedTupleMember): string => {
-    const typeText = m.kind === "namedTuple" ? tupleCastText(m) : m.kind === "enum" ? m.target! : (m.typeName ?? "str");
-    return positional ? typeText : `${m.name}: ${typeText}`;
-  };
-  return `tuple<${members.map(elementText).join(", ")}>`;
+  return `tuple<${members.map((m) => (positional ? elementCastText(m) : `${m.name}: ${elementCastText(m)}`)).join(", ")}>`;
 };
 
-// The PyQL cast type for a property/enum/namedTuple pointer's value — e.g.
-// "std::str", the enum's own qualified name for an enum cast
-// (`<default::Gender>$p0`), or the named tuple's own qualified name (nominal)
-// / reconstructed `tuple<...>` text (structural) for a namedTuple cast.
+// The cast text for an array pointer's own element type — e.g. `array<str>`,
+// `array<default::Gender>`, or `array<tuple<x: std::float64, y: std::float64>>`.
+const arrayCastText = (element: NamedTupleMember): string => `array<${elementCastText(element)}>`;
+
+// The PyQL cast type for a property/enum/namedTuple/array pointer's value —
+// e.g. "std::str", the enum's own qualified name for an enum cast
+// (`<default::Gender>$p0`), the named tuple's own qualified name (nominal)
+// / reconstructed `tuple<...>` text (structural) for a namedTuple cast, or
+// `array<...>` for an array cast.
 const castTypeFor = (pointer: SchemaPointer): string =>
-  pointer.kind === "enum" ? pointer.target! : pointer.kind === "namedTuple" ? tupleCastText(pointer) : (pointer.typeName ?? "str");
+  pointer.kind === "enum"
+    ? pointer.target!
+    : pointer.kind === "namedTuple"
+      ? tupleCastText(pointer)
+      : pointer.kind === "array" && pointer.element
+        ? arrayCastText(pointer.element)
+        : (pointer.typeName ?? "str");
 
 const groupLinkEditsByObjectId = (linkEdits: Map<string, UpdateLinkEdit>): Map<string | number, UpdateLinkEdit[]> => {
   const byId = new Map<string | number, UpdateLinkEdit[]>();

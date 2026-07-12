@@ -32,7 +32,8 @@ export const resolveTupleMembers = (member: {target?: string; members?: NamedTup
   return schema.namedTuples.find((nt) => nt.module === module && nt.name === name)?.members ?? [];
 };
 
-const defaultMemberValue = (member: NamedTupleMember, schema: SchemaResponse): unknown => {
+// Exported for reuse by ArrayEditor.tsx (a new array item's initial value).
+export const defaultMemberValue = (member: NamedTupleMember, schema: SchemaResponse): unknown => {
   if (member.kind === "namedTuple") return defaultTupleValue(resolveTupleMembers(member, schema), schema);
   if (member.kind === "enum") return null;
   if (member.typeName === "std::bool") return false;
@@ -82,7 +83,11 @@ export const TupleEditor: React.FC<TupleEditorProps> = ({members, schema, value,
   );
 };
 
-const MemberEditor: React.FC<{
+// Exported for reuse by ArrayEditor.tsx — an array element's own type is the
+// same {kind, target?, typeName?, members?} shape as one tuple member's
+// type, so the same per-kind widget (enum select, bool toggle, nested-tuple
+// panel, plain scalar input) applies unchanged.
+export const MemberEditor: React.FC<{
   member: NamedTupleMember;
   schema: SchemaResponse;
   value: unknown;

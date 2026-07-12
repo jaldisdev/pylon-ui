@@ -8,7 +8,8 @@ import {resolveTupleMembers} from "@/ui/dataEditor/TupleEditor";
 export type PointerTypeTag =
   | {kind: "scalar"; tag: string}
   | {kind: "enum"; module: string; name: string}
-  | {kind: "namedTuple"; members: NamedTupleMember[]};
+  | {kind: "namedTuple"; members: NamedTupleMember[]}
+  | {kind: "array"; element: NamedTupleMember};
 
 // Only these typeNames get a `<tag>` prefix on their value — plain str/int/
 // bool/json are self-evident from their JS type already. Tag text matches
@@ -28,7 +29,7 @@ const TAG_BY_TYPE_NAME: Record<string, string> = {
 // generateStatements.ts building a param's display tag) don't need to
 // re-look it up by object-type + pointer name.
 export const pointerTypeTag = (
-  pointer: {kind: string; target?: string; typeName?: string; members?: NamedTupleMember[]},
+  pointer: {kind: string; target?: string; typeName?: string; members?: NamedTupleMember[]; element?: NamedTupleMember},
   schema: SchemaResponse
 ): PointerTypeTag | null => {
   if (pointer.kind === "enum" && pointer.target) {
@@ -38,6 +39,10 @@ export const pointerTypeTag = (
 
   if (pointer.kind === "namedTuple") {
     return {kind: "namedTuple", members: resolveTupleMembers(pointer, schema)};
+  }
+
+  if (pointer.kind === "array" && pointer.element) {
+    return {kind: "array", element: pointer.element};
   }
 
   const tag = pointer.typeName ? TAG_BY_TYPE_NAME[pointer.typeName] : undefined;

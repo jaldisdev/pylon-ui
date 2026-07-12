@@ -18,6 +18,22 @@ export const resolveTupleParamMembers = (
   return nt ? nt.members : null;
 };
 
+// Same detection as resolveTupleParamMembers, for a query param cast to
+// `array<T>` — resolves T's own member-shape descriptor so ParamsPanel can
+// render an ArrayEditor instead of a plain text input. Returns null for any
+// other cast (including tuple/enum/scalar, handled above).
+export const resolveArrayParamElement = (
+  castType: string | null,
+  schema: SchemaResponse | undefined
+): NamedTupleMember | null => {
+  if (!castType || !schema) return null;
+  const trimmed = castType.trim();
+  if (!/^array\s*</i.test(trimmed) || !trimmed.endsWith(">")) return null;
+  const inner = trimmed.slice(trimmed.indexOf("<") + 1, -1).trim();
+  if (!inner) return null;
+  return parseTypeText(inner, schema);
+};
+
 // Splits a `tuple<...>` cast's inner element-list text on top-level commas —
 // tracking `<...>` nesting depth so a nested tuple element's own internal
 // commas aren't mistaken for top-level separators.
@@ -51,7 +67,13 @@ const parseTupleElement = (text: string, schema: SchemaResponse): NamedTupleMemb
   const colonIdx = splitTopLevel(text, ":").length > 1 ? text.indexOf(":") : -1;
   const name = colonIdx === -1 ? null : text.slice(0, colonIdx).trim();
   const typeText = (colonIdx === -1 ? text : text.slice(colonIdx + 1)).trim();
+  return parseTypeText(typeText, schema, name);
+};
 
+// Classifies a bare type-reference string (no "name:" prefix) into a member
+// descriptor — shared by a tuple element's own type (after stripping any
+// "name:" prefix) and an array's element type (which never has one).
+const parseTypeText = (typeText: string, schema: SchemaResponse, name: string | null = null): NamedTupleMember => {
   if (/^tuple\s*</i.test(typeText)) {
     const members = parseStructuralTupleCast(typeText, schema) ?? [];
     return {name, kind: "namedTuple", members};

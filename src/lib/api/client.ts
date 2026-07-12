@@ -153,7 +153,7 @@ export const api = {
     }),
 };
 
-export type SchemaPointerKind = "property" | "link" | "multiLink" | "computed" | "enum" | "namedTuple";
+export type SchemaPointerKind = "property" | "link" | "multiLink" | "computed" | "enum" | "namedTuple" | "array";
 
 export interface SchemaPointer {
   name: string;
@@ -167,6 +167,12 @@ export interface SchemaPointer {
   // registered type to reference via `target` — the shape is declared
   // inline here instead).
   members?: NamedTupleMember[];
+  // "array" only — the element type (pylon.Array[T] or a bare list[T]).
+  // `name` is always null on this entry (an array element isn't named);
+  // otherwise the same {kind, target?, typeName?, members?} shape as one
+  // NamedTupleMember, reused so scalar/enum/namedTuple element types all
+  // classify identically to a tuple member's own type.
+  element?: NamedTupleMember;
   // Canonical PyQL/EdgeQL-style type name for "property"/"computed" pointers
   // (e.g. "std::str", "std::uuid", "cal::local_date") — shown below the
   // pointer name in the Data Explorer's column headers, and used to decide

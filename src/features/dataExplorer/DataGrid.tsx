@@ -61,15 +61,16 @@ const headerTypeLabel = (pointer: SchemaPointer): string | null => {
   if (pointer.kind === "link" || pointer.kind === "enum") return pointer.target ?? null;
   if (pointer.kind === "multiLink") return pointer.target ? `multi ${pointer.target}` : "multi";
   if (pointer.kind === "namedTuple") return pointer.target ?? "tuple";
+  if (pointer.kind === "array") return `array<${pointer.element?.typeName ?? pointer.element?.target ?? "..."}>`;
   return pointer.typeName ?? null;
 };
 
-// Non-computed, non-id property/enum/namedTuple cells are double-click
-// editable. A readonly pointer is still settable once, at insert time —
-// only post-creation updates are blocked (matches Pylon/gel-ui's readonly
-// rule).
+// Non-computed, non-id property/enum/namedTuple/array cells are
+// double-click editable. A readonly pointer is still settable once, at
+// insert time — only post-creation updates are blocked (matches
+// Pylon/gel-ui's readonly rule).
 const isEditableCell = (pointer: SchemaPointer, isInsertRow: boolean) =>
-  (pointer.kind === "property" || pointer.kind === "enum" || pointer.kind === "namedTuple") &&
+  (pointer.kind === "property" || pointer.kind === "enum" || pointer.kind === "namedTuple" || pointer.kind === "array") &&
   pointer.name !== "id" &&
   (!pointer.readonly || isInsertRow);
 

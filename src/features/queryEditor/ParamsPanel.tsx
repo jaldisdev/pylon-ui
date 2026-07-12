@@ -5,7 +5,8 @@ import type {NamedTupleMember, SchemaResponse} from "@/lib/api/client";
 import type {ExtractedParam} from "@/lib/editor/lang-pyql/extractParams";
 import {Select, type SelectOption} from "@/ui/Select";
 import {defaultTupleValue, TupleEditor} from "@/ui/dataEditor/TupleEditor";
-import {resolveTupleParamMembers} from "@/features/queryEditor/tupleParamCast";
+import {ArrayEditor} from "@/ui/dataEditor/ArrayEditor";
+import {resolveArrayParamElement, resolveTupleParamMembers} from "@/features/queryEditor/tupleParamCast";
 
 interface ParamsPanelProps {
   params: ExtractedParam[];
@@ -51,6 +52,23 @@ const TupleParamEditor: React.FC<{
   );
 };
 
+// Same embedded-inline pattern as TupleParamEditor, for an array<T> param —
+// an empty array is a perfectly valid default draft (unlike a tuple, which
+// needs every member populated), so there's no defaultArrayValue equivalent.
+const ArrayParamEditor: React.FC<{
+  name: string;
+  element: NamedTupleMember;
+  raw: string;
+  schema: SchemaResponse;
+  onChange: (name: string, raw: string) => void;
+}> = ({name, element, raw, schema, onChange}) => {
+  const parsed = raw ? safeParseJson(raw) : undefined;
+  const value = Array.isArray(parsed) ? parsed : [];
+  return (
+    <ArrayEditor element={element} schema={schema} value={value} onChange={(next) => onChange(name, JSON.stringify(next))} />
+  );
+};
+
 // One labeled input per $name parameter detected in the query text, styled
 // after Gel's own param inputs — a floating cast-type tag in the input's top
 // right corner, which turns red (along with the input's border) once the
@@ -74,10 +92,12 @@ export const ParamsPanel: React.FC<ParamsPanelProps> = ({params, values, errors,
           // precedence over the value's own validation error.
           const error = param.castConflict ?? errors[param.name];
           const tupleMembers = resolveTupleParamMembers(param.castType, schema);
-          // A tuple param always renders with a fully-populated default
-          // draft (see TupleParamEditor) — it's never "missing", unlike a
+          const arrayElement = resolveArrayParamElement(param.castType, schema);
+          // A tuple/array param always renders with a valid default draft
+          // (a fully-populated tuple, or an empty array — see
+          // TupleParamEditor/ArrayParamEditor) — never "missing", unlike a
           // blank scalar input.
-          const isMissingRequired = !tupleMembers && param.required && raw.trim() === "";
+          const isMissingRequired = !tupleMembers && !arrayElement && param.required && raw.trim() === "";
           const invalid = !!error || isMissingRequired;
           const paramEnum = findEnum(schema, param.castType);
 
@@ -87,6 +107,8 @@ export const ParamsPanel: React.FC<ParamsPanelProps> = ({params, values, errors,
               <div className="min-w-0 flex-1">
                 {tupleMembers && schema ? (
                   <TupleParamEditor name={param.name} members={tupleMembers} raw={raw} schema={schema} onChange={onChange} />
+                ) : arrayElement && schema ? (
+                  <ArrayParamEditor name={param.name} element={arrayElement} raw={raw} schema={schema} onChange={onChange} />
                 ) : paramEnum ? (
                   <Select
                     options={paramEnum.members.map((m): SelectOption => ({value: m, label: m}))}

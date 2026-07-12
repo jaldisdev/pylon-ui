@@ -8,19 +8,15 @@ import type {EditValue} from "@/features/dataExplorer/state/editsStore";
 import {Select, type SelectOption} from "@/ui/Select";
 import {resolveTupleMembers} from "@/ui/dataEditor/TupleEditor";
 import {TuplePopover} from "@/ui/dataEditor/TuplePopover";
+import {ArrayPopover} from "@/ui/dataEditor/ArrayPopover";
 
 // Inline per-scalar-type cell editor, mounted in place of a grid cell on
 // double-click — mirrors gel-ui's dataEditor component library
 // (shared/studio/components/dataEditor/*): bool -> two pill buttons, enum ->
-// dropdown, str/json -> auto-growing textarea, everything else -> a plain
-// validated text input. No date-picker anywhere, matching gel-ui exactly —
-// dates/times are free-text validated against the same regexes the Query
-// Editor's params already use.
-//
-// Pylon properties are single-valued only (no EdgeQL-style multi-cardinality
-// scalar properties — confirmed empirically, see the plan) so there's no
-// array-editor widget here; multi-valued data only exists via multi-links,
-// which are edited through the grid's link-edit mode, not inline.
+// dropdown, str/json -> auto-growing textarea, array<T> -> ArrayPopover,
+// everything else -> a plain validated text input. No date-picker anywhere,
+// matching gel-ui exactly — dates/times are free-text validated against the
+// same regexes the Query Editor's params already use.
 interface DataEditorCellProps {
   pointer: SchemaPointer;
   schema: SchemaResponse;
@@ -64,6 +60,8 @@ export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, 
             onCommit={onCommit}
             onDiscard={onDiscard}
           />
+        ) : pointer.kind === "array" && pointer.element ? (
+          <ArrayPopover element={pointer.element} schema={schema} initialValue={initialValue} onCommit={onCommit} onDiscard={onDiscard} />
         ) : pointer.kind === "enum" ? (
           <EnumEditor pointer={pointer} schema={schema} initialValue={initialValue} onCommit={onCommit} onDiscard={onDiscard} />
         ) : pointer.typeName === "std::bool" ? (

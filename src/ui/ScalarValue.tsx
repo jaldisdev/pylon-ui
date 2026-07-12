@@ -89,13 +89,18 @@ export const ScalarValue: React.FC<ScalarValueProps> = ({value, typeTag, compact
     return <span className="text-[var(--syntax-number)]">{String(value)}</span>;
   }
   if (Array.isArray(value)) {
+    // Per-element type tag when this array's own element type is known
+    // (a schema array<T> property/param) — an enum/namedTuple element still
+    // needs its own tag to render correctly (e.g. member names, tuple
+    // literal syntax), not just the default JSON-ish fallback.
+    const elementTag = typeTag?.kind === "array" && schema ? memberTypeTag(typeTag.element, schema) : null;
     return (
       <span>
         [
         {value.map((item, i) => (
           <span key={i}>
             {i > 0 && ", "}
-            <ScalarValue value={item} typeTag={null} compact={compact} />
+            <ScalarValue value={item} typeTag={elementTag} compact={compact} schema={schema} />
           </span>
         ))}
         ]
