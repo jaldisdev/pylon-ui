@@ -3,24 +3,13 @@ import {useEffect, useMemo, useRef, useState} from "react";
 import {ChevronDown, Plus} from "lucide-react";
 
 import type {SchemaResponse, SchemaType} from "@/lib/api/client";
+import {isSelfOrDescendant, qualname} from "@/lib/schema/inheritance";
 
 interface InsertRowButtonProps {
   schema: SchemaResponse;
   schemaType: SchemaType;
   onInsert: (concreteTypeName: string) => void;
 }
-
-const qualname = (t: SchemaType) => `${t.module}::${t.name}`;
-
-// Whether `type` is `ancestorQualname` itself, or descends from it through
-// Pylon's real inheritance (@pylon.abstract/@pylon.interface) — walks
-// `bases` transitively rather than assuming a single level.
-const isSelfOrDescendant = (schema: SchemaResponse, type: SchemaType, ancestorQualname: string): boolean =>
-  qualname(type) === ancestorQualname ||
-  type.bases.some((baseQualname) => {
-    const base = schema.types.find((t) => qualname(t) === baseQualname);
-    return base ? isSelfOrDescendant(schema, base, ancestorQualname) : false;
-  });
 
 // The concrete (non-abstract) insertable options for the type currently
 // being viewed — itself, if concrete, plus any concrete descendants. An

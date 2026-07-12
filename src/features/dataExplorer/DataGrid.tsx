@@ -6,6 +6,7 @@ import {useVirtualizer} from "@tanstack/react-virtual";
 import {ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, Link2, Menu, Trash2, Undo2} from "lucide-react";
 
 import type {SchemaPointer, SchemaResponse} from "@/lib/api/client";
+import {isSelfOrDescendant, qualname} from "@/lib/schema/inheritance";
 import {lookupPointerTypeTag} from "@/lib/schema/typeTags";
 import {ScalarValue} from "@/ui/ScalarValue";
 import {DataEditorCell} from "@/ui/dataEditor/DataEditorCell";
@@ -116,8 +117,20 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const toggleLinkInsert = useDataEditsStore((s) => s.toggleLinkInsert);
   const setLinkTargetProperty = useDataEditsStore((s) => s.setLinkTargetProperty);
 
+  // A pending insert also shows on every ancestor type's own grid view (not
+  // just its own concrete type) — matching Gel: inserting a Person on the
+  // abstract Account grid stays visible there (only Account's own pointers
+  // editable) and again once you drill into the concrete Person type (its
+  // additional pointers now editable too), rather than only ever appearing
+  // after switching to the concrete type.
   const displayRows = useMemo<DisplayRow[]>(() => {
-    const pendingInserts = Array.from(insertEdits.values()).filter((ins) => ins.objectTypeName === pylonType);
+    const viewedType = schema?.types.find((t) => qualname(t) === pylonType);
+    const pendingInserts = Array.from(insertEdits.values()).filter((ins) => {
+      if (ins.objectTypeName === pylonType) return true;
+      if (!schema || !viewedType) return false;
+      const insertType = schema.types.find((t) => qualname(t) === ins.objectTypeName);
+      return insertType ? isSelfOrDescendant(schema, insertType, pylonType) : false;
+    });
     const all = [
       ...pendingInserts.map((ins): DisplayRow => ({kind: "insert", tempId: ins.id})),
       ...rows.map((row): DisplayRow => ({kind: "fetched", row})),
@@ -128,7 +141,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
     // MultiLink[Person]), where the row being edited would otherwise show up
     // as a pickable candidate for its own pointer too.
     return all.filter((r) => (r.kind === "insert" ? r.tempId : ((r.row.id as string | undefined) ?? "")) !== linkEditMode.parentId);
-  }, [insertEdits, pylonType, rows, linkEditMode]);
+  }, [insertEdits, pylonType, rows, linkEditMode, schema]);
 
   const columns = useMemo<ColumnDef<Row>[]>(
     () => pointers.map((pointer) => ({id: pointer.name, accessorKey: pointer.name})),

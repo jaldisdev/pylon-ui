@@ -7,11 +7,6 @@
    setting. See src/lib/theme/useTheme.tsx. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme {
-    --text-2sm: 0.8rem;
-    --text-2xs: 0.625rem;
-}
-
 /* Semantic color tokens, one definition per mode. Components use the
    `--color-*` utilities below (e.g. bg-surface, text-fg) instead of raw
    Tailwind palette classes, so every surface repaints together when the
@@ -31,7 +26,7 @@
   --color-border: #e6e6e6;
   --color-fg: var(--color-neutral-900);
   --color-fg-muted: var(--color-neutral-500);
-  --color-accent: var(--color-violet-600);
+  --color-accent: var(--color-blue-600);
   --color-accent-fg: var(--color-white);
   --color-success: var(--color-green-600);
   --color-success-fg: var(--color-white);
@@ -47,7 +42,7 @@
   --shadow-card: 0 0 8px rgba(0, 0, 0, 0.04), 0 0 4px rgba(0, 0, 0, 0.06);
 
   /* PyQL syntax highlighting, used by src/lib/editor/theme.ts */
-  --syntax-keyword: var(--color-violet-600);
+  --syntax-keyword: var(--color-indigo-600);
   --syntax-string: var(--color-green-600);
   --syntax-comment: var(--color-neutral-400);
   --syntax-name: var(--color-blue-600);
@@ -64,9 +59,9 @@
   --color-border: #4d4d4d;
   --color-fg: var(--color-neutral-100);
   --color-fg-muted: var(--color-neutral-400);
-  --color-accent: var(--color-violet-500);
+  --color-accent: var(--color-blue-500);
   --color-accent-fg: var(--color-white);
-  --color-success: var(--color-green-600);
+  --color-success: var(--color-emerald-600);
   --color-success-fg: var(--color-white);
   --color-tooltip: #adadad;
   --color-tooltip-fg: #141414;
@@ -98,6 +93,9 @@
 
   --font-sans: "Roboto Flex Variable", "Roboto", sans-serif;
   --font-mono: "Roboto Mono Variable", "Roboto Mono", monospace;
+
+  --text-2sm: 0.8rem;
+  --text-2xs: 0.625rem;
 }
 
 body {
