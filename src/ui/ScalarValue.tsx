@@ -46,7 +46,13 @@ export const ScalarValue: React.FC<ScalarValueProps> = ({value, typeTag, compact
             <ScalarValue
               value={memberValue(m, i)}
               typeTag={schema ? memberTypeTag(m, schema) : null}
-              compact={compact}
+              // Never propagate the outer `compact` down into a member's own
+              // value — compact means "this value's type is obvious from
+              // context" (a grid column header, a cast just before it), which
+              // is true for the tuple/array as a whole but not for any one
+              // member buried inside it. Stripping a member's quotes there
+              // would make a string member indistinguishable from a bare
+              // identifier or number.
               schema={schema}
             />
           </span>
@@ -100,7 +106,10 @@ export const ScalarValue: React.FC<ScalarValueProps> = ({value, typeTag, compact
         {value.map((item, i) => (
           <span key={i}>
             {i > 0 && ", "}
-            <ScalarValue value={item} typeTag={elementTag} compact={compact} schema={schema} />
+            {/* Same reasoning as the tuple-member case above: an array
+                element has no context of its own to make an unquoted string
+                unambiguous, so `compact` never propagates down to it. */}
+            <ScalarValue value={item} typeTag={elementTag} schema={schema} />
           </span>
         ))}
         ]
