@@ -3,6 +3,7 @@
 // behind the same-origin /api mount in production.
 
 import {useGlobalsStore} from "@/lib/state/globalsStore";
+import {useConfigStore} from "@/lib/state/configStore";
 
 export class ApiError extends Error {
   constructor(
@@ -101,6 +102,17 @@ export interface GlobalsResponse {
   globals: GlobalInfo[];
 }
 
+export interface ConfigOptionInfo {
+  name: string;
+  // Only "bool" today — the only type pylon-core's SessionConfig knows.
+  typeName: string;
+  default: unknown;
+}
+
+export interface ConfigOptionsResponse {
+  options: ConfigOptionInfo[];
+}
+
 export interface ChatModelInfo {
   name: string;
   model: string;
@@ -156,19 +168,25 @@ export const api = {
   getConnections: () => request<ConnectionsResponse>("/connections"),
   getModels: () => request<ModelsResponse>("/models"),
   getGlobals: () => request<GlobalsResponse>("/globals"),
+  getConfigOptions: () => request<ConfigOptionsResponse>("/config-options"),
   getStats: () => connectionRequest<StatsResponse>("/stats"),
   runQuery: (pyql: string, params?: Record<string, unknown>, signal?: AbortSignal) =>
     connectionRequest<QueryResponse>("/query", {
       method: "POST",
       // Session globals (configured via the top bar's globals modal) apply
       // to every query automatically — callers never need to pass them. Only
-      // toggled-on globals are sent; a disabled one stays stored client-side
-      // but is excluded here.
+      // toggled-on globals/config options are sent; a disabled one stays
+      // stored client-side but is excluded here.
       body: JSON.stringify({
         pyql,
         params,
         globals: Object.fromEntries(
           Object.entries(useGlobalsStore.getState().entries)
+            .filter(([, entry]) => entry.enabled)
+            .map(([key, entry]) => [key, entry.value])
+        ),
+        config: Object.fromEntries(
+          Object.entries(useConfigStore.getState().entries)
             .filter(([, entry]) => entry.enabled)
             .map(([key, entry]) => [key, entry.value])
         ),
