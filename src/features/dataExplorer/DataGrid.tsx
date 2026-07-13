@@ -71,6 +71,15 @@ const headerTypeLabel = (pointer: SchemaPointer): string | null => {
   return pointer.typeName ?? null;
 };
 
+// The virtualizer assumes every row is exactly this tall (see
+// rowVirtualizer's estimateSize below) to position rows via a fixed
+// translateY offset — it never remeasures, so an *actual* rendered row
+// height that drifts from this causes rows to visibly overlap/gap ("jump")
+// as soon as one does. Applied as an explicit height (with overflow-hidden)
+// on every data cell, both displaying and editing, so entering/leaving edit
+// mode can never change a row's real height.
+const ROW_HEIGHT = 42;
+
 const GUTTER_WIDTH = 40;
 const THROUGH_COLUMN_DEFAULT_WIDTH = 112;
 const COLUMN_DEFAULT_WIDTH = 180;
@@ -93,6 +102,10 @@ const isEditableCell = (pointer: SchemaPointer, isInsertRow: boolean) =>
   (pointer.kind === "property" || pointer.kind === "enum" || pointer.kind === "namedTuple" || pointer.kind === "array") &&
   pointer.name !== "id" &&
   (!pointer.readonly || isInsertRow);
+
+// A pending insert's temp id, or a fetched row's real uuid — same identity
+// DataEditsStore keys edits by (see ActivePropertyEdit.objectId).
+const rowObjectId = (row: DisplayRow): string | number => (row.kind === "insert" ? row.tempId : ((row.row.id as string | undefined) ?? ""));
 
 // Virtualized (rows) data grid: a gutter column (row number / delete-undo
 // icon / link-edit-mode checkbox), a pinned id column, sortable
@@ -200,7 +213,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const rowVirtualizer = useVirtualizer({
     count: displayRows.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 42,
+    estimateSize: () => ROW_HEIGHT,
     overscan: 10,
   });
 
@@ -208,6 +221,45 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const totalHeight = rowVirtualizer.getTotalSize();
   const paddingTop = virtualRows[0]?.start ?? 0;
   const paddingBottom = totalHeight - (virtualRows[virtualRows.length - 1]?.end ?? 0);
+
+  // Tab/Shift+Tab while editing a cell — advances to the next/previous
+  // editable cell in reading order (row-major: across a row's pointers, then
+  // down to the next row), skipping non-editable pointers (links, readonly
+  // post-creation, id). Stops at the first/last row rather than wrapping —
+  // `displayRows` holds the *entire* dataset (virtualization only limits
+  // what's rendered), so this reaches rows outside the current scroll
+  // viewport too; scrollToIndex brings the target row into view when that
+  // happens.
+  const moveToAdjacentEditableCell = (backwards: boolean) => {
+    if (!activePropertyEdit) return;
+    const rowIndex = displayRows.findIndex((r) => rowObjectId(r) === activePropertyEdit.objectId);
+    const pointerIndex = pointers.findIndex((p) => p.name === activePropertyEdit.pointerName);
+    if (rowIndex === -1 || pointerIndex === -1) return;
+
+    const step = backwards ? -1 : 1;
+    let r = rowIndex;
+    let p = pointerIndex;
+    const totalCells = displayRows.length * pointers.length;
+    for (let i = 0; i < totalCells; i++) {
+      p += step;
+      if (p < 0) {
+        p = pointers.length - 1;
+        r -= 1;
+      } else if (p >= pointers.length) {
+        p = 0;
+        r += 1;
+      }
+      if (r < 0 || r >= displayRows.length) return;
+
+      const candidateRow = displayRows[r];
+      const candidatePointer = pointers[p];
+      if (isEditableCell(candidatePointer, candidateRow.kind === "insert")) {
+        startEditingCell({objectId: rowObjectId(candidateRow), objectTypeName: pylonType, pointerName: candidatePointer.name});
+        if (r !== rowIndex) rowVirtualizer.scrollToIndex(r, {align: "auto"});
+        return;
+      }
+    }
+  };
 
   // Output
   return (
@@ -303,7 +355,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
           {virtualRows.map((virtualRow) => {
             const displayRow = displayRows[virtualRow.index];
             const isInsertRow = displayRow.kind === "insert";
-            const objectId: string | number = isInsertRow ? displayRow.tempId : ((displayRow.row.id as string | undefined) ?? "");
+            const objectId = rowObjectId(displayRow);
             const isDeletedRow = !isInsertRow && deleteEdits.has(objectId as string);
 
             let linkChecked = false;
@@ -343,8 +395,9 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 className={clsx("group/row hover:bg-surface-hover", isDeletedRow && "pointer-events-none opacity-50")}
               >
                 <td
+                  style={{height: ROW_HEIGHT}}
                   className={clsx(
-                    "sticky left-0 border-b border-l-2 bg-surface px-2 py-2.5 text-right font-mono text-xs text-fg-muted shadow-[var(--shadow-sticky-col)] group-hover/row:bg-surface-hover md:shadow-none",
+                    "sticky left-0 overflow-hidden border-b border-l-2 bg-surface px-2 py-2.5 text-right font-mono text-xs text-fg-muted shadow-[var(--shadow-sticky-col)] group-hover/row:bg-surface-hover md:shadow-none",
                     isInsertRow ? "border-b-border border-l-green-500" : isDeletedRow ? "border-b-border border-l-red-500" : "border-border border-l-transparent"
                   )}
                 >
@@ -360,7 +413,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                   />
                 </td>
                 {linkEditMode?.throughPointers?.map((tp) => (
-                  <td key={`@${tp.name}`} className="border-b border-border px-2 py-1.5">
+                  <td key={`@${tp.name}`} style={{height: ROW_HEIGHT}} className="overflow-hidden border-b border-border px-2 py-1.5">
                     <LinkPropertyCell
                       pointer={tp}
                       schema={schema!}
@@ -398,11 +451,31 @@ export const DataGrid: React.FC<DataGridProps> = ({
                         if (!cellEditable) return;
                         startEditingCell({objectId, objectTypeName: pylonType, pointerName: pointer.name});
                       }}
+                      style={{height: ROW_HEIGHT}}
                       className={clsx(
-                        "overflow-hidden border-b border-border px-2 py-2.5 font-mono text-ellipsis whitespace-nowrap",
+                        "border-b border-border font-mono text-ellipsis whitespace-nowrap",
+                        // Editing drops the cell's own padding so the editor
+                        // inside (ScalarMemberInput et al.) can sit flush
+                        // against the cell's edges, matching Gel's own inline
+                        // editor look, instead of being inset within it. Also
+                        // drops overflow-hidden — needed the rest of the time
+                        // for text-ellipsis truncation, but while editing it
+                        // would clip the optional "unset" button, which
+                        // deliberately renders past this cell's own right
+                        // edge (translate-x-full, see DataEditorCell.tsx).
+                        // Safe to drop here: the editor's own height is now
+                        // exact (see ScalarMemberInput's leading-0 fix), so
+                        // there's nothing left for it to still be guarding
+                        // against vertically.
+                        isEditing ? "p-0" : "overflow-hidden px-2 py-2.5",
                         pointer.name === "id" &&
                           "sticky left-10 bg-surface shadow-[var(--shadow-sticky-col)] group-hover/row:bg-surface-hover max-md:static max-md:left-auto max-md:shadow-none",
-                        isLink && "cursor-pointer"
+                        isLink && "cursor-pointer",
+                        // Hints a cell is double-click-editable before the
+                        // user commits to it, matching Gel's own hover state
+                        // — ring (not border) so it draws inset, inside the
+                        // existing border-box, rather than shifting layout.
+                        cellEditable && !isEditing && "cursor-text hover:ring-1 hover:ring-inset hover:ring-accent"
                       )}
                     >
                       {isEditing ? (
@@ -412,6 +485,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                           initialValue={displayValue}
                           onCommit={commitPropertyEdit}
                           onDiscard={discardActiveEdit}
+                          onTabNext={moveToAdjacentEditableCell}
                         />
                       ) : isLink ? (
                         isInsertRow ? (

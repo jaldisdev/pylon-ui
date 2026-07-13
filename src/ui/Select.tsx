@@ -7,12 +7,18 @@ export interface SelectOption {
   label: string;
 }
 
-type Props = ReactSelectProps<SelectOption, false, GroupBase<SelectOption>>;
+type Props = ReactSelectProps<SelectOption, false, GroupBase<SelectOption>> & {
+  // Grid-cell usage (DataEditorCell's EnumEditor) — fills the cell's full
+  // height flush against its edges, matching ScalarMemberInput's own `dense`
+  // styling, instead of the roomier fixed h-10/rounded-md control every
+  // other Select caller (GlobalsModal, ParamsPanel, ...) wants.
+  dense?: boolean;
+};
 
 // Thin `unstyled` wrapper around react-select — classNames map to our own
 // design tokens instead of react-select's default inline-styled look, so it
 // matches every other input/dropdown in the app.
-export const Select: React.FC<Props> = (props) => (
+export const Select: React.FC<Props> = ({dense, ...props}) => (
   <ReactSelect
     unstyled
     menuPlacement="auto"
@@ -32,9 +38,14 @@ export const Select: React.FC<Props> = (props) => (
     // itself does.
     styles={{menuPortal: (base) => ({...base, zIndex: 60})}}
     classNames={{
+      // `control`'s own h-full needs a definite (non-auto) height to resolve
+      // against — react-select's outer container div doesn't have one by
+      // default, so dense mode gives it one too.
+      container: () => clsx(dense && "h-full"),
       control: ({isFocused, isDisabled}) =>
         clsx(
-          "flex h-10 items-center rounded-md border bg-surface px-1.5 text-sm",
+          "flex items-center border bg-surface",
+          dense ? "h-full rounded-none px-2 text-2sm" : "h-10 rounded-md px-1.5 text-sm",
           isFocused ? "border-accent" : "border-border",
           isDisabled && "opacity-50"
         ),

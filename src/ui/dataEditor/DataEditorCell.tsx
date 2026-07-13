@@ -23,6 +23,10 @@ interface DataEditorCellProps {
   initialValue: unknown;
   onCommit: (value: EditValue) => void;
   onDiscard: () => void;
+  // Tab/Shift+Tab while editing — moves to the next/previous editable cell
+  // instead of native tab-to-next-focusable-DOM-element, matching a
+  // spreadsheet-like grid rather than a page full of separate form fields.
+  onTabNext: (backwards: boolean) => void;
 }
 
 const valueToRawText = (value: unknown): string => {
@@ -47,7 +51,7 @@ const normalizeForCompare = (value: unknown): unknown => (value === undefined ? 
 const isUnchanged = (value: EditValue, initialValue: unknown): boolean =>
   value.valid && JSON.stringify(normalizeForCompare(value.value)) === JSON.stringify(normalizeForCompare(initialValue));
 
-export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, initialValue, onCommit, onDiscard}) => {
+export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, initialValue, onCommit, onDiscard, onTabNext}) => {
   const optional = !pointer.required;
   // Every editor below commits through this instead of the raw prop — a
   // committed value that's identical to what the cell already held (e.g. the
@@ -62,13 +66,32 @@ export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, 
     onCommit(value);
   };
 
+  // flex + items-stretch is what reliably fills the cell's full height (a
+  // plain block chain of nested `h-full`s is fragile — percentage heights
+  // don't cascade dependably through several stacked levels inside a table
+  // cell). `relative` alongside it (a flex container can be positioned too)
+  // gives the optional "unset" button below a containing block to overlay
+  // on top of, absolutely, rather than being a flex sibling that adds its
+  // own width to the row — a flex sibling doesn't fit within a fixed-width
+  // `table-fixed` column (the row ends up wider than the cell, spilling its
+  // right edge into the next column) since nothing forces it to share space
+  // with the editor beside it once their combined min-content width exceeds
+  // the cell.
   return (
     <div
-      className="flex items-stretch"
+      className="relative flex h-full items-stretch"
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.stopPropagation();
           onDiscard();
+        } else if (e.key === "Tab") {
+          e.preventDefault();
+          e.stopPropagation();
+          // Blurring first (rather than after) flushes TextEditor's own
+          // pending-commit-on-blur synchronously, so the just-typed value is
+          // saved before this cell's editor unmounts underneath onTabNext.
+          (document.activeElement as HTMLElement | null)?.blur();
+          onTabNext(e.shiftKey);
         }
       }}
     >
@@ -96,24 +119,28 @@ export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, 
         ) : pointer.typeName === "std::bool" ? (
           <BoolEditor initialValue={initialValue} onCommit={commitIfChanged} />
         ) : (
-          <TextEditor pointer={pointer} initialValue={initialValue} onCommit={commitIfChanged} squareRight={optional} />
+          <TextEditor pointer={pointer} initialValue={initialValue} onCommit={commitIfChanged} />
         )}
       </div>
       {/* Optional pointers get an explicit "clear to {}" action, matching
-          gel-ui's tan pill button butted against the input's right edge —
-          the only way to blank an optional value rather than typing
-          something. Immediately commits (no separate "empty mode"),
-          matching gel-ui's onClose(false)-on-click behavior. A tuple/array
-          pointer renders this same action *inside* its own popover instead
-          (see the `optional` prop above) — the popover is portalled and
-          floats away from this collapsed cell once expanded, so a button
-          left behind here would look detached from it. */}
+          gel-ui's tan pill button — the only way to blank an optional value
+          rather than typing something. Immediately commits (no separate
+          "empty mode"), matching gel-ui's onClose(false)-on-click behavior. A
+          tuple/array pointer renders this same action *inside* its own
+          popover instead (see the `optional` prop above) — the popover is
+          portalled and floats away from this collapsed cell once expanded,
+          so a button left behind here would look detached from it.
+          translate-x-full pushes it entirely past the cell's own right edge
+          (rather than reserving space for it inside the editor, which would
+          shift the editor's text/value off-center from where the static
+          display shows it) — DataGrid.tsx skips this cell's overflow-hidden
+          while editing so it isn't clipped there. */}
       {optional && pointer.kind !== "namedTuple" && pointer.kind !== "array" && (
         <button
           type="button"
           title="Set to {}"
           onClick={() => commitIfChanged({valid: true, value: null})}
-          className="flex shrink-0 items-center justify-center rounded-r-md bg-orange-500 px-2 font-mono text-2sm font-medium text-white hover:opacity-90 dark:bg-orange-600"
+          className="absolute inset-y-0 right-0 z-10 flex translate-x-full items-center justify-center rounded-r-md bg-orange-500 px-2 font-mono text-2sm font-medium text-white hover:opacity-90 dark:bg-orange-600"
         >
           {"{}"}
         </button>
@@ -145,6 +172,7 @@ const EnumEditor: React.FC<{
 
   return (
     <Select
+      dense
       autoFocus
       menuIsOpen
       options={options}
@@ -176,8 +204,7 @@ const TextEditor: React.FC<{
   pointer: SchemaPointer;
   initialValue: unknown;
   onCommit: (value: EditValue) => void;
-  squareRight?: boolean;
-}> = ({pointer, initialValue, onCommit, squareRight}) => {
+}> = ({pointer, initialValue, onCommit}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const castType = pointer.typeName ?? null;
   const isMultiline = castType === "std::str" || castType === "std::json";
@@ -208,15 +235,15 @@ const TextEditor: React.FC<{
   };
 
   return (
-    <div ref={containerRef} className="h-full">
+    <div ref={containerRef} className="h-full w-full">
       <ScalarMemberInput
         dense
         autoFocus
         value={initialValue}
         castType={castType}
         multiline={isMultiline}
-        squareRight={squareRight}
         onKeyDown={onKeyDown}
+        onBlur={commit}
         onChange={(raw, coerced, valid) => {
           latestRef.current = valid ? {valid: true, value: coerced} : {valid: false, raw, error: validateCastValue(raw, castType) ?? ""};
         }}

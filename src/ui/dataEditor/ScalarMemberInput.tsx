@@ -33,8 +33,8 @@ interface ScalarMemberInputProps {
   placeholder?: string;
   autoFocus?: boolean;
   multiline?: boolean;
-  squareRight?: boolean;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onBlur?: () => void;
   // External error (e.g. "required, currently empty") merged with the
   // internal cast-shape validation — whichever is non-null wins.
   error?: string | null;
@@ -54,8 +54,8 @@ export const ScalarMemberInput: React.FC<ScalarMemberInputProps> = ({
   placeholder,
   autoFocus,
   multiline,
-  squareRight,
   onKeyDown,
+  onBlur,
   error: externalError,
   dense,
 }) => {
@@ -111,10 +111,24 @@ export const ScalarMemberInput: React.FC<ScalarMemberInputProps> = ({
   const error = externalError ?? internalError;
   const showTag = castType && !dense;
   const inputClassName = clsx(
-    "w-full rounded-md border bg-surface font-mono text-fg outline-none disabled:opacity-50",
-    dense ? "h-full px-1.5 py-1 text-2sm" : "h-10 px-2.5 text-sm",
+    "w-full border bg-surface font-mono text-fg outline-none disabled:opacity-50",
+    // Dense (grid-cell) mode now sits flush against the cell's own edges
+    // (see DataGrid.tsx's `isEditing ? "p-0" : ...`) — a rounded corner
+    // butted against a square cell boundary looks like a clipped corner, so
+    // it's squared off there instead; the roomier modal/panel surfaces keep
+    // the rounding.
+    dense ? "rounded-none" : "rounded-md",
+    // Dense mode fills the cell's full height edge-to-edge (matching Gel) —
+    // a native <input> already vertically centers its own text regardless of
+    // box height, but a <textarea> does *not* (it top-aligns), so vertical
+    // padding is dropped in favor of a fixed line-height exactly matching the
+    // available content height (ROW_HEIGHT minus the 1px border on each
+    // side — see DataGrid.tsx's ROW_HEIGHT), centering a single line via the
+    // classic line-height trick instead. Only looks right for one line, but
+    // multi-row growth is already moot: the cell's own overflow-hidden caps
+    // it at ROW_HEIGHT regardless.
+    dense ? "h-full px-2 text-2sm leading-[40px]" : "h-10 px-2.5 text-sm",
     showTag && "pr-14",
-    squareRight ? "rounded-r-none border-r-0" : undefined,
     error ? "border-[var(--syntax-operator)]" : "border-border focus:border-accent"
   );
 
@@ -124,8 +138,12 @@ export const ScalarMemberInput: React.FC<ScalarMemberInputProps> = ({
     onChange(next, nextError ? next : coerceParamValue(next, castType), !nextError);
   };
 
+  // leading-0 on the wrapper: a <textarea> is inline-level for the purpose
+  // of its containing block's line box, so the wrapper's own (inherited,
+  // non-zero) line-height was adding extra height on top of the textarea's
+  // own box — exactly the "cell grows by a few px while editing" bug.
   return (
-    <div className={clsx("relative", dense && "h-full")}>
+    <div className={clsx("relative leading-0", dense && "h-full")}>
       {multiline ? (
         <textarea
           autoFocus={autoFocus}
@@ -133,6 +151,7 @@ export const ScalarMemberInput: React.FC<ScalarMemberInputProps> = ({
           value={raw}
           onChange={(e) => commit(e.target.value)}
           onKeyDown={onKeyDown}
+          onBlur={onBlur}
           rows={Math.min(6, Math.max(1, raw.split("\n").length))}
           className={clsx(inputClassName, "resize-none", !dense && "py-1")}
         />
@@ -145,6 +164,7 @@ export const ScalarMemberInput: React.FC<ScalarMemberInputProps> = ({
           placeholder={placeholder}
           onChange={(e) => commit(e.target.value)}
           onKeyDown={onKeyDown}
+          onBlur={onBlur}
           className={inputClassName}
         />
       )}
