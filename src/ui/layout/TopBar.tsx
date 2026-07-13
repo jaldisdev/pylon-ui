@@ -1,5 +1,6 @@
 import type React from "react";
-import {useState} from "react";
+import {useEffect, useRef, useState} from "react";
+import clsx from "clsx";
 import {Dock, Moon, Settings, Sun, SunMoon} from "lucide-react";
 
 import Logo from "@/assets/logo.svg?react";
@@ -9,12 +10,7 @@ import {GlobalsModal} from "@/features/globals/GlobalsModal";
 import {ConnectionMenu} from "@/ui/layout/ConnectionMenu";
 import {Tooltip} from "@/ui/Tooltip";
 
-// Cycles through the three theme modes in a fixed order on each click.
-const NEXT_THEME: Record<Theme, Theme> = {
-  light: "dark",
-  dark: "system",
-  system: "light",
-};
+const THEME_ORDER: Theme[] = ["light", "dark", "system"];
 
 const THEME_ICON: Record<Theme, typeof Sun> = {
   light: Sun,
@@ -27,8 +23,21 @@ const THEME_ICON: Record<Theme, typeof Sun> = {
 export const TopBar: React.FC = () => {
   const {data: connections} = useConnections();
   const {theme, setTheme} = useTheme();
-  const ThemeIcon = THEME_ICON[theme];
   const [globalsModalOpen, setGlobalsModalOpen] = useState(false);
+
+  // Click (not hover) opens the theme menu — same click-outside-closes
+  // pattern as InsertRowButton.tsx's type dropdown, and works on mobile
+  // where there's no hover state at all.
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const themeMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!themeMenuOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (!themeMenuRef.current?.contains(e.target as Node)) setThemeMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [themeMenuOpen]);
 
   // Output
   return (
@@ -56,15 +65,46 @@ export const TopBar: React.FC = () => {
             <Settings size={18} strokeWidth={1.75} />
           </button>
         </Tooltip>
-        <Tooltip label={`Theme: ${theme}`} side="bottom" align="end">
-          <button
-            type="button"
-            onClick={() => setTheme(NEXT_THEME[theme])}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-fg-muted hover:bg-surface-hover hover:text-fg"
+        {/* Fixed-size placeholder reserves this button's normal-flow slot —
+            the actual pill below is absolutely positioned within it, so its
+            click-triggered expansion never shifts the Settings button (or
+            anything else) — it only ever overlays the space to its left,
+            matching Gel's own expanding theme switcher. */}
+        <div ref={themeMenuRef} className="relative h-8 w-8">
+          <div
+            className={clsx(
+              "absolute inset-y-0 right-0 z-10 flex items-center justify-end rounded-md",
+              themeMenuOpen ? "bg-surface-hover" : "hover:bg-surface-hover"
+            )}
           >
-            <ThemeIcon size={20} strokeWidth={1.75} />
-          </button>
-        </Tooltip>
+            {THEME_ORDER.map((t) => {
+              const Icon = THEME_ICON[t];
+              const isActive = t === theme;
+              const expanded = isActive || themeMenuOpen;
+              return (
+                <Tooltip key={t} label={`Theme: ${t}`} side="bottom" align="end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!themeMenuOpen) {
+                        setThemeMenuOpen(true);
+                        return;
+                      }
+                      setTheme(t);
+                      setThemeMenuOpen(false);
+                    }}
+                    className={clsx(
+                      "flex h-8 shrink-0 items-center justify-center overflow-hidden rounded-md text-fg-muted transition-[width] duration-200 hover:bg-surface-hover hover:text-fg",
+                      expanded ? "w-8" : "w-0"
+                    )}
+                  >
+                    <Icon size={20} strokeWidth={1.75} className="shrink-0" />
+                  </button>
+                </Tooltip>
+              );
+            })}
+          </div>
+        </div>
       </div>
       {globalsModalOpen && <GlobalsModal onClose={() => setGlobalsModalOpen(false)} />}
     </header>
