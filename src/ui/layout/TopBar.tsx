@@ -2,6 +2,7 @@ import type React from "react";
 import {useEffect, useRef, useState} from "react";
 import clsx from "clsx";
 import {Dock, Moon, Settings, Sun, SunMoon} from "lucide-react";
+import {useHotkeys} from "react-hotkeys-hook";
 
 import Logo from "@/assets/logo.svg?react";
 import {useConnections} from "@/lib/api/useConnections";
@@ -24,6 +25,24 @@ export const TopBar: React.FC = () => {
   const {data: connections} = useConnections();
   const {theme, setTheme} = useTheme();
   const [globalsModalOpen, setGlobalsModalOpen] = useState(false);
+
+  // Mod+, alone is intercepted by Safari/Chrome at the OS-menu level for the
+  // *browser's own* Preferences before it ever reaches page JS — no
+  // preventDefault() can recover it. Mod+Alt+<key> isn't a safe substitute
+  // either: on Mac, Option remaps the reported key character (e.g. Option+R
+  // becomes "®"), and Safari has its own native Option-held shortcuts (e.g.
+  // Cmd+Option+R = "Reload Page From Origin") that fire before page JS ever
+  // sees the event. Mod+Shift+<key> is the combo browsers actually leave
+  // alone (aside from a handful of specific letters — see the Mod+Shift+R
+  // note in DataExplorerView.tsx).
+  useHotkeys(
+    "mod+shift+comma",
+    (event) => {
+      event.preventDefault();
+      setGlobalsModalOpen(true);
+    },
+    {enableOnContentEditable: true, enableOnFormTags: true, eventListenerOptions: {capture: true}}
+  );
 
   // Click (not hover) opens the theme menu — same click-outside-closes
   // pattern as InsertRowButton.tsx's type dropdown, and works on mobile
@@ -56,7 +75,7 @@ export const TopBar: React.FC = () => {
         <ConnectionMenu />
       </div>
       <div className="flex items-center gap-1 ml-auto">
-        <Tooltip label="Session globals" side="bottom" align="end">
+        <Tooltip label="Preferences" side="bottom" align="end">
           <button
             type="button"
             onClick={() => setGlobalsModalOpen(true)}

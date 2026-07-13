@@ -10,12 +10,15 @@ interface ObjectTypeSelectProps {
   types: SchemaType[];
   selected: SchemaType | null;
   onSelect: (type: SchemaType) => void;
+  // Controlled so DataExplorerView's Mod+P hotkey (matching Gel's own type
+  // quick-switcher) can open this from outside a click on the button itself.
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 // Root-level object type picker for the Data Explorer — a button showing the
 // current type, opening a filterable dropdown list of every type in the schema.
-export const ObjectTypeSelect: React.FC<ObjectTypeSelectProps> = ({types, selected, onSelect}) => {
-  const [open, setOpen] = useState(false);
+export const ObjectTypeSelect: React.FC<ObjectTypeSelectProps> = ({types, selected, onSelect, open, onOpenChange}) => {
   const [search, setSearch] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -23,11 +26,11 @@ export const ObjectTypeSelect: React.FC<ObjectTypeSelectProps> = ({types, select
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!containerRef.current?.contains(e.target as Node)) onOpenChange(false);
     };
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
-  }, [open]);
+  }, [open, onOpenChange]);
 
   // Fuzzy-match + rank by quality (contiguous/early matches first), the way
   // Gel's Cmd+P type search does — not just a plain substring filter.
@@ -43,7 +46,7 @@ export const ObjectTypeSelect: React.FC<ObjectTypeSelectProps> = ({types, select
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => onOpenChange(!open)}
         className="flex h-8 items-center gap-1.5 rounded-md px-2 font-mono text-sm text-fg hover:bg-surface-hover"
       >
         {selected ? (
@@ -75,7 +78,7 @@ export const ObjectTypeSelect: React.FC<ObjectTypeSelectProps> = ({types, select
                   type="button"
                   onClick={() => {
                     onSelect(type);
-                    setOpen(false);
+                    onOpenChange(false);
                     setSearch("");
                   }}
                   className="block w-full px-2 py-1.5 text-left font-mono text-sm hover:bg-surface-hover"

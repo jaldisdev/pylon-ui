@@ -2,6 +2,7 @@ import type React from "react";
 import {useEffect, useMemo, useState} from "react";
 import {useNavigate, useParams} from "react-router-dom";
 import {useQuery} from "@tanstack/react-query";
+import {useHotkeys} from "react-hotkeys-hook";
 import {ArrowLeft, Filter, Link2, RefreshCw} from "lucide-react";
 import clsx from "clsx";
 
@@ -10,10 +11,11 @@ import {useSchema} from "@/lib/api/useSchema";
 import {useTheme} from "@/lib/theme/useTheme";
 import {DataGrid, type LinkEditMode, type SortDir} from "@/features/dataExplorer/DataGrid";
 import {FilterPanel} from "@/features/dataExplorer/FilterPanel";
-import {InsertRowButton} from "@/features/dataExplorer/InsertRowButton";
+import {concreteSubtypes, InsertRowButton} from "@/features/dataExplorer/InsertRowButton";
 import {ObjectTypeSelect} from "@/features/dataExplorer/ObjectTypeSelect";
 import {parseInsertIndex, stackToPath, type StackEntry} from "@/features/dataExplorer/stack";
 import {useDataEditsStore} from "@/features/dataExplorer/state/editsStore";
+import {qualname} from "@/lib/schema/inheritance";
 
 type Row = Record<string, unknown>;
 
@@ -52,6 +54,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
   // every object of the target type (not just currently-linked ones) with a
   // checkbox/radio per row, matching gel-ui's link-picker-is-the-grid design.
   const [linkEditModeOn, setLinkEditModeOn] = useState(false);
+  const [typeSelectOpen, setTypeSelectOpen] = useState(false);
   const createNewRow = useDataEditsStore((s) => s.createNewRow);
   const insertEdits = useDataEditsStore((s) => s.insertEdits);
 
@@ -215,6 +218,76 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
     }
   };
 
+  // Same condition InsertRowButton is rendered under below — reused by the
+  // Mod+I hotkey to decide whether inserting even makes sense right now.
+  const canInsert = (!current.parent || linkEditModeOn || isInsertParent) && !!schema && !!schemaType;
+
+  const handleInsert = (concreteTypeName: string) => {
+    createNewRow(
+      concreteTypeName,
+      current.parent && (linkEditModeOn || isInsertParent) && (!isInsertParent || parentTempId !== undefined)
+        ? {
+            parentId: isInsertParent ? parentTempId! : current.parent.id,
+            parentObjectTypeName: current.parent.parentType,
+            pointerName: current.parent.fieldName,
+            linkTypeName: current.pylonType,
+            single: isSingleLink,
+          }
+        : undefined
+    );
+  };
+
+  // Matches Gel's own Mod+P object-type quick-switcher — only meaningful at
+  // the root view, where ObjectTypeSelect itself is shown.
+  useHotkeys(
+    "mod+p",
+    (event) => {
+      if (current.parent) return;
+      event.preventDefault();
+      setTypeSelectOpen(true);
+    },
+    {enableOnContentEditable: true, enableOnFormTags: true, eventListenerOptions: {capture: true}}
+  );
+
+  // Inserts directly when there's exactly one concrete type to insert; an
+  // interface with several concrete implementers can't be disambiguated by a
+  // single keystroke, so this is a no-op then — use the Insert… dropdown.
+  useHotkeys(
+    "mod+i",
+    (event) => {
+      if (!canInsert || !schema || !schemaType) return;
+      const options = concreteSubtypes(schema, schemaType);
+      if (options.length !== 1) return;
+      event.preventDefault();
+      handleInsert(qualname(options[0]));
+    },
+    {enableOnContentEditable: true, enableOnFormTags: true, eventListenerOptions: {capture: true}}
+  );
+
+  // Mod+F is the browser's own find-in-page and can't be reclaimed — see
+  // TopBar.tsx's note on why Mod+Alt+<key> isn't a safe substitute either.
+  // Mod+Shift+<key> is the combo that's actually left alone.
+  useHotkeys(
+    "mod+shift+f",
+    (event) => {
+      event.preventDefault();
+      setFilterOpen((o) => !o);
+    },
+    {enableOnContentEditable: true, enableOnFormTags: true, eventListenerOptions: {capture: true}}
+  );
+
+  // Not Mod+Shift+R: that's Safari's own "Show Reader" shortcut, reserved the
+  // same way Mod+, is (see TopBar.tsx) — fires natively regardless of any
+  // page-level preventDefault. Mod+Shift+U ("Update") dodges it.
+  useHotkeys(
+    "mod+shift+u",
+    (event) => {
+      event.preventDefault();
+      dataQuery.refetch();
+    },
+    {enableOnContentEditable: true, enableOnFormTags: true, eventListenerOptions: {capture: true}}
+  );
+
   // Output
   return (
     <>
@@ -242,6 +315,8 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
               types={schema.types}
               selected={schemaType ?? null}
               onSelect={(type) => navigate(`${basePath}/${type.module}::${type.name}`)}
+              open={typeSelectOpen}
+              onOpenChange={setTypeSelectOpen}
             />
           ) : null}
         </div>
@@ -290,25 +365,8 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
             </button>
           )}
 
-          {(!current.parent || linkEditModeOn || isInsertParent) && schema && schemaType && (
-            <InsertRowButton
-              schema={schema}
-              schemaType={schemaType}
-              onInsert={(concreteTypeName) =>
-                createNewRow(
-                  concreteTypeName,
-                  current.parent && (linkEditModeOn || isInsertParent) && (!isInsertParent || parentTempId !== undefined)
-                    ? {
-                        parentId: isInsertParent ? parentTempId! : current.parent.id,
-                        parentObjectTypeName: current.parent.parentType,
-                        pointerName: current.parent.fieldName,
-                        linkTypeName: current.pylonType,
-                        single: isSingleLink,
-                      }
-                    : undefined
-                )
-              }
-            />
+          {canInsert && schema && schemaType && (
+            <InsertRowButton schema={schema} schemaType={schemaType} onInsert={handleInsert} />
           )}
 
           <button

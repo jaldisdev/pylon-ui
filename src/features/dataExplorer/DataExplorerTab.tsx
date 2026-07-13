@@ -1,6 +1,7 @@
 import type React from "react";
 import {useState} from "react";
 import {Navigate, useParams} from "react-router-dom";
+import {useHotkeys} from "react-hotkeys-hook";
 
 import {useSchema} from "@/lib/api/useSchema";
 import {Card} from "@/ui/Card";
@@ -19,6 +20,18 @@ export const DataExplorerTab: React.FC = () => {
   const basePath = `/${branch}/data`;
   const hasPendingEdits = useHasPendingEdits();
   const [reviewOpen, setReviewOpen] = useState(false);
+
+  // Mod+S opens Review Changes — only meaningful once there's something
+  // pending; registered here (not DataExplorerView, which remounts on every
+  // nested-view navigation) so it survives drilling into a link and back.
+  useHotkeys(
+    "mod+s",
+    (event) => {
+      event.preventDefault();
+      if (hasPendingEdits) setReviewOpen(true);
+    },
+    {enableOnContentEditable: true, enableOnFormTags: true, eventListenerOptions: {capture: true}}
+  );
 
   if (!schema) {
     return (

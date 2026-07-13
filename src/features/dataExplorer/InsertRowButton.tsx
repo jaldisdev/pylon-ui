@@ -16,7 +16,7 @@ interface InsertRowButtonProps {
 // abstract/interface type with multiple concrete implementers (e.g.
 // pylon-demo's Account -> Individual/Organization) gets a dropdown instead
 // of a single button.
-const concreteSubtypes = (schema: SchemaResponse, type: SchemaType): SchemaType[] =>
+export const concreteSubtypes = (schema: SchemaResponse, type: SchemaType): SchemaType[] =>
   schema.types.filter((t) => !t.abstract && isSelfOrDescendant(schema, t, qualname(type)));
 
 export const InsertRowButton: React.FC<InsertRowButtonProps> = ({schema, schemaType, onInsert}) => {
