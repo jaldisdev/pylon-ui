@@ -92,19 +92,34 @@ export const memberTypeTag = (member: NamedTupleMember, schema: SchemaResponse):
 // based lookupPointerTypeTag above has nothing to go on. Only "enum" and
 // "namedTuple" shapes are themselves a type tag; "object"/"array" shapes are
 // structural (JsonTree recurses into them via valueShapeChild below instead).
-export const valueShapeToPointerTypeTag = (shape: ValueShapeTag): PointerTypeTag | null => {
+export const valueShapeToPointerTypeTag = (shape: ValueShapeTag, schema?: SchemaResponse): PointerTypeTag | null => {
   if (!shape) return null;
   if (shape.kind === "enum") {
     const [module, name] = shape.enumType.split("::");
     return {kind: "enum", module, name};
   }
   if (shape.kind === "namedTuple") {
-    return {kind: "namedTuple", members: (shape.members ?? []).map(valueShapeMemberToNamedTupleMember)};
+    return {kind: "namedTuple", members: valueShapeTupleMembers(shape, schema)};
   }
   return null;
 };
 
-const valueShapeMemberToNamedTupleMember = (m: {key: string | null; shape: ValueShapeTag}): NamedTupleMember => {
+// A named-tuple value-shape inlines its own `members` for a structural
+// (anonymous `tuple<...>`) tuple, but omits them (`members: null` — see
+// pylon/query.py's shape_value_tags) for a *nominal* `@pylon.named_tuple`
+// type (e.g. Point) — resolved via `typeName` against schema.namedTuples
+// instead, the same fallback resolveTupleMembers already does for a schema
+// pointer's own NamedTupleMember (TupleEditor.tsx).
+const valueShapeTupleMembers = (
+  shape: {typeName: string | null; members: {key: string | null; shape: ValueShapeTag}[] | null},
+  schema?: SchemaResponse
+): NamedTupleMember[] => {
+  if (shape.members) return shape.members.map((m) => valueShapeMemberToNamedTupleMember(m, schema));
+  if (!schema || !shape.typeName) return [];
+  return resolveTupleMembers({target: shape.typeName}, schema);
+};
+
+const valueShapeMemberToNamedTupleMember = (m: {key: string | null; shape: ValueShapeTag}, schema?: SchemaResponse): NamedTupleMember => {
   const shape = m.shape;
   if (shape?.kind === "enum") {
     return {name: m.key, kind: "enum", target: shape.enumType};
@@ -113,7 +128,7 @@ const valueShapeMemberToNamedTupleMember = (m: {key: string | null; shape: Value
     return {
       name: m.key,
       kind: "namedTuple",
-      members: (shape.members ?? []).map(valueShapeMemberToNamedTupleMember),
+      members: valueShapeTupleMembers(shape, schema),
     };
   }
   return {name: m.key, kind: "scalar"};

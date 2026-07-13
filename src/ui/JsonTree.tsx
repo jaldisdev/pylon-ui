@@ -91,7 +91,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({label, value, schema, parentPylonTyp
       <div className="group/row flex items-center rounded pl-4 hover:bg-surface-hover">
         <div className="flex-1">
           {label !== undefined && <span className="text-[var(--syntax-name)]">{label}: </span>}
-          <ScalarValue value={value} typeTag={valueShapeToPointerTypeTag(valueShape)} schema={schema} />
+          <ScalarValue value={value} typeTag={valueShapeToPointerTypeTag(valueShape, schema)} schema={schema} />
         </div>
         <CopyButton value={value} />
       </div>
@@ -144,7 +144,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({label, value, schema, parentPylonTyp
   }
 
   const typeTag = valueShape
-    ? valueShapeToPointerTypeTag(valueShape)
+    ? valueShapeToPointerTypeTag(valueShape, schema)
     : label !== undefined
       ? lookupPointerTypeTag(schema, parentPylonType, label)
       : null;
