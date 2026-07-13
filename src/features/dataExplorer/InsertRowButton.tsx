@@ -29,9 +29,9 @@ export const InsertRowButton: React.FC<InsertRowButtonProps> = ({schema, schemaT
       <button
         type="button"
         onClick={() => onInsert(qualname(options[0]))}
-        className="flex h-7 items-center gap-1 rounded-md px-2 text-2sm text-fg-muted hover:bg-surface-hover"
+        className="flex h-8.5 items-center gap-1 rounded-md px-2 text-sm text-fg-muted bg-surface-hover hover:bg-surface-active border border-border transition duration-300"
       >
-        <Plus size={12} strokeWidth={1.75} />
+        <Plus size={16} strokeWidth={1.75} />
         Insert {options[0].name}
       </button>
     );
@@ -61,9 +61,9 @@ const InsertTypeDropdown: React.FC<{options: SchemaType[]; onInsert: (concreteTy
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex h-7 items-center gap-1 rounded-md px-2 text-2sm text-fg-muted hover:bg-surface-hover"
+        className="flex h-8.5 items-center gap-1 rounded-md px-2 text-sm text-fg-muted bg-surface hover:bg-surface-hover border border-border transition duration-300"
       >
-        <Plus size={12} strokeWidth={1.75} />
+        <Plus size={16} strokeWidth={1.75} />
         Insert…
         <ChevronDown size={12} strokeWidth={1.75} />
       </button>

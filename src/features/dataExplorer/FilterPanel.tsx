@@ -42,17 +42,17 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({defaultValue, onApply, 
           type="button"
           disabled={!hasActiveFilter}
           onClick={onClear}
-          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-fg-muted hover:bg-surface-hover disabled:pointer-events-none disabled:opacity-40"
+          className="flex items-center gap-1 h-7 rounded-sm px-2 py-1 text-2sm text-fg-muted hover:bg-surface-hover disabled:pointer-events-none disabled:opacity-40"
         >
-          <X size={12} strokeWidth={1.75} />
+          <X size={14} strokeWidth={1.75} />
           Clear
         </button>
         <button
           type="button"
           onClick={applyFilter}
-          className="flex items-center gap-1 rounded bg-accent px-2 py-1 text-xs text-accent-fg"
+          className="flex items-center gap-1 h-7 rounded-sm bg-accent px-2 py-1 text-2sm text-accent-fg"
         >
-          <Check size={12} strokeWidth={1.75} />
+          <Check size={14} strokeWidth={1.75} />
           Apply filter
         </button>
       </div>

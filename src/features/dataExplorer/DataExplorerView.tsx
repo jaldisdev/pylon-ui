@@ -338,7 +338,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
                 onClick={() => dataQuery.refetch()}
                 className="flex h-6 w-6 items-center justify-center rounded hover:bg-surface-hover hover:text-fg"
               >
-                <RefreshCw size={12} strokeWidth={1.75} />
+                <RefreshCw size={16} strokeWidth={1.75} />
               </button>
             </>
           ) : (
@@ -352,8 +352,9 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
               type="button"
               onClick={() => setLinkEditModeOn((o) => !o)}
               className={clsx(
-                "flex h-7 items-center gap-1 rounded-md px-2 text-2sm",
-                linkEditModeOn ? "bg-surface-hover text-accent" : "text-fg-muted hover:bg-surface-hover"
+                "flex h-7 items-center gap-1 rounded-md px-2 text-sm",
+                linkEditModeOn ? "bg-surface-hover text-accent" : "text-fg-muted hover:bg-surface-hover",
+                "transition duration-300"
               )}
             >
               <Link2 size={12} strokeWidth={1.75} />
@@ -365,7 +366,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
             <button
               type="button"
               onClick={onOpenReview}
-              className="rounded-md bg-orange-500 px-3 py-1 text-2sm font-medium text-white transition duration-300 hover:opacity-90 dark:bg-orange-600"
+              className="rounded-md bg-orange-500 px-3 py-1 text-sm font-medium text-white transition duration-300 hover:opacity-90 dark:bg-orange-600"
             >
               Review Changes
             </button>
@@ -379,11 +380,12 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
             type="button"
             onClick={() => setFilterOpen((o) => !o)}
             className={clsx(
-              "flex h-7 items-center gap-1 rounded-md px-2 text-2sm",
-              filterOpen || filterExpr ? "bg-surface-hover text-accent" : "text-fg-muted hover:bg-surface-hover"
+              "flex h-8.5 items-center gap-1 rounded-md px-2 text-sm",
+              filterOpen || filterExpr ? "bg-surface-hover text-accent" : "text-fg-muted hover:bg-surface-hover",
+              "transition duration-300"
             )}
           >
-            <Filter size={12} strokeWidth={1.75} />
+            <Filter size={16} strokeWidth={1.75} />
             Filter
           </button>
         </div>
