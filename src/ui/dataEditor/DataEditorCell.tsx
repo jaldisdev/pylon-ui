@@ -80,6 +80,7 @@ export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, 
             initialValue={initialValue}
             onCommit={commitIfChanged}
             onDiscard={onDiscard}
+            optional={optional}
           />
         ) : pointer.kind === "array" && pointer.element ? (
           <ArrayPopover
@@ -88,6 +89,7 @@ export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, 
             initialValue={initialValue}
             onCommit={commitIfChanged}
             onDiscard={onDiscard}
+            optional={optional}
           />
         ) : pointer.kind === "enum" ? (
           <EnumEditor pointer={pointer} schema={schema} initialValue={initialValue} onCommit={commitIfChanged} onDiscard={onDiscard} />
@@ -101,8 +103,12 @@ export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, 
           gel-ui's tan pill button butted against the input's right edge —
           the only way to blank an optional value rather than typing
           something. Immediately commits (no separate "empty mode"),
-          matching gel-ui's onClose(false)-on-click behavior. */}
-      {optional && (
+          matching gel-ui's onClose(false)-on-click behavior. A tuple/array
+          pointer renders this same action *inside* its own popover instead
+          (see the `optional` prop above) — the popover is portalled and
+          floats away from this collapsed cell once expanded, so a button
+          left behind here would look detached from it. */}
+      {optional && pointer.kind !== "namedTuple" && pointer.kind !== "array" && (
         <button
           type="button"
           title="Set to {}"

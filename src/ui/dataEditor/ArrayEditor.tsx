@@ -40,15 +40,18 @@ export const ArrayEditor: React.FC<ArrayEditorProps> = ({element, schema, value,
       </span>
       <div className="flex flex-col gap-1.5">
         {value.map((item, index) => (
-          <div key={index} className="flex items-stretch">
-            <div className="min-w-0 flex-1 [&_input]:rounded-r-none [&_input]:border-r-0">
+          <div
+            key={index}
+            className="flex items-stretch overflow-hidden rounded-md border border-border transition-colors duration-300 focus-within:border-accent [&_input]:rounded-none [&_input]:border-none [&_textarea]:rounded-none [&_textarea]:border-none"
+          >
+            <div className="min-w-0 flex-1">
               <MemberEditor member={element} schema={schema} value={item} onChange={(next) => setItem(index, next)} depth={0} />
             </div>
             <button
               type="button"
               title="Remove"
               onClick={() => removeItem(index)}
-              className="flex shrink-0 items-center justify-center rounded-r-md border border-l-0 border-border bg-surface-hover px-2 text-fg-muted hover:bg-red-500/10 hover:text-red-500"
+              className="flex shrink-0 items-center justify-center rounded-r-md border-l border-border bg-surface-hover px-2 text-fg-muted hover:bg-red-500/10 hover:text-red-500"
             >
               <Trash2 size={14} strokeWidth={1.75} />
             </button>
