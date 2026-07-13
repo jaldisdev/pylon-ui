@@ -34,6 +34,20 @@ export const resolveArrayParamElement = (
   return parseTypeText(inner, schema);
 };
 
+// Inverse of parseTupleElement/parseTypeText below — renders a structural
+// tuple's member list back out as PyQL/EdgeQL `tuple<...>` syntax (e.g.
+// "tuple<street: std::str, zip: std::str>"), for display in places like the
+// Data Explorer's column headers where a nominal tuple's `target` name isn't
+// available. Recurses for a nested structural tuple member.
+export const formatTupleMemberType = (member: NamedTupleMember): string => {
+  if (member.kind === "scalar") return member.typeName ?? "unknown";
+  if (member.kind === "enum") return member.target ?? "unknown";
+  return member.target ?? formatTupleType(member.members ?? []);
+};
+
+export const formatTupleType = (members: NamedTupleMember[]): string =>
+  `tuple<${members.map((m) => (m.name ? `${m.name}: ${formatTupleMemberType(m)}` : formatTupleMemberType(m))).join(", ")}>`;
+
 // Splits a `tuple<...>` cast's inner element-list text on top-level commas —
 // tracking `<...>` nesting depth so a nested tuple element's own internal
 // commas aren't mistaken for top-level separators.

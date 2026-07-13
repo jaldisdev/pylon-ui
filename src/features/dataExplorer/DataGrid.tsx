@@ -8,6 +8,7 @@ import {ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, Link2, Menu, Trash2, Undo2}
 import type {SchemaPointer, SchemaResponse} from "@/lib/api/client";
 import {isSelfOrDescendant, qualname} from "@/lib/schema/inheritance";
 import {lookupPointerTypeTag} from "@/lib/schema/typeTags";
+import {formatTupleType} from "@/lib/schema/tupleTypeCast";
 import {ScalarValue} from "@/ui/ScalarValue";
 import {DataEditorCell} from "@/ui/dataEditor/DataEditorCell";
 import {LinkPropertyCell} from "@/ui/dataEditor/LinkPropertyCell";
@@ -65,7 +66,7 @@ const isSortable = (pointer: SchemaPointer) =>
 const headerTypeLabel = (pointer: SchemaPointer): string | null => {
   if (pointer.kind === "link" || pointer.kind === "enum") return pointer.target ?? null;
   if (pointer.kind === "multiLink") return pointer.target ? `multi ${pointer.target}` : "multi";
-  if (pointer.kind === "namedTuple") return pointer.target ?? "tuple";
+  if (pointer.kind === "namedTuple") return pointer.target ?? (pointer.members ? formatTupleType(pointer.members) : "tuple");
   if (pointer.kind === "array") return `array<${pointer.element?.typeName ?? pointer.element?.target ?? "..."}>`;
   return pointer.typeName ?? null;
 };
