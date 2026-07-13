@@ -97,7 +97,13 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
   const query = useMemo(() => {
     if (pointers.length === 0) return null;
     const shape = buildShape(pointers);
-    const orderClause = sortField ? ` order by .${sortField} ${sortDir}` : "";
+    // With no explicit column sort, fall back to creation order (id is a
+    // uuidv7, so it's chronological) rather than omitting ORDER BY entirely —
+    // an unordered SELECT returns Postgres's physical heap-scan order, which
+    // is stable for untouched rows but relocates a row to wherever its new
+    // tuple version lands after an UPDATE, making edited rows appear to jump
+    // to the end of the list on refresh.
+    const orderClause = sortField ? ` order by .${sortField} ${sortDir}` : " order by .id asc";
     const filterClause = filterExpr ? ` filter ${filterExpr}` : "";
 
     if (current.parent && !isInsertParent && !linkEditModeOn) {
