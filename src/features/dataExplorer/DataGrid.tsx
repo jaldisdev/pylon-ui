@@ -1,5 +1,5 @@
 import type React from "react";
-import {useMemo, useRef} from "react";
+import {useMemo, useRef, useState} from "react";
 import clsx from "clsx";
 import {getCoreRowModel, useReactTable, type ColumnDef} from "@tanstack/react-table";
 import {useVirtualizer} from "@tanstack/react-virtual";
@@ -71,6 +71,20 @@ const headerTypeLabel = (pointer: SchemaPointer): string | null => {
   return pointer.typeName ?? null;
 };
 
+const GUTTER_WIDTH = 40;
+const THROUGH_COLUMN_DEFAULT_WIDTH = 112;
+const COLUMN_DEFAULT_WIDTH = 180;
+const COLUMN_MIN_WIDTH = 60;
+// Wide enough for a full uuidv7 (36 chars, e.g.
+// "019f3395-7177-787e-b3d0-97acd3b9ffc0") in the grid's font-mono text-sm —
+// the id column's own default width, applied only at md+ via Tailwind's
+// responsive variant directly on its <col> (see the colgroup below): it's
+// sticky and worth always reading in full there, but on mobile it scrolls
+// with everything else, so it isn't worth the extra space it'd otherwise
+// cost. A user-dragged resize (tracked in `columnWidths`) overrides this at
+// any breakpoint, same as any other column.
+const ID_COLUMN_CLASS = "w-45 md:w-80";
+
 // Non-computed, non-id property/enum/namedTuple/array cells are
 // double-click editable. A readonly pointer is still settable once, at
 // insert time — only post-creation updates are blocked (matches
@@ -101,6 +115,35 @@ export const DataGrid: React.FC<DataGridProps> = ({
   linkEditMode,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Per-column widths (keyed by pointer name, or `@name` for a through-type
+  // property column) — drag-resized via the handle on each header's right
+  // edge; unset columns fall back to their default width (from the
+  // <colgroup> below). Table uses a <colgroup> (not per-cell width classes)
+  // so header and body cells for the same column always agree, which
+  // `table-fixed` layout requires anyway.
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+
+  // Reads the column's actual rendered width off the DOM at drag-start
+  // (rather than duplicating its default width as a JS constant) so this
+  // stays correct regardless of how that default was set — including the id
+  // column's own md+-only default, which only exists as a Tailwind class.
+  const startResize = (key: string) => (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startWidth = e.currentTarget.parentElement?.getBoundingClientRect().width ?? COLUMN_DEFAULT_WIDTH;
+    const startX = e.clientX;
+    const onMove = (moveEvent: MouseEvent) => {
+      const next = Math.max(COLUMN_MIN_WIDTH, startWidth + (moveEvent.clientX - startX));
+      setColumnWidths((prev) => ({...prev, [key]: next}));
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
 
   const insertEdits = useDataEditsStore((s) => s.insertEdits);
   const deleteEdits = useDataEditsStore((s) => s.deleteEdits);
@@ -169,17 +212,32 @@ export const DataGrid: React.FC<DataGridProps> = ({
   // Output
   return (
     <div ref={scrollRef} className="flex-1 overflow-auto bg-surface">
-      <table className="w-full border-collapse text-sm">
+      <table className="w-full table-fixed border-collapse text-sm">
+        <colgroup>
+          <col style={{width: GUTTER_WIDTH}} />
+          {linkEditMode?.throughPointers?.map((tp) => (
+            <col key={`@${tp.name}`} style={{width: columnWidths[`@${tp.name}`] ?? THROUGH_COLUMN_DEFAULT_WIDTH}} />
+          ))}
+          {pointers.map((pointer) => {
+            const resized = columnWidths[pointer.name];
+            if (resized !== undefined) return <col key={pointer.name} style={{width: resized}} />;
+            return <col key={pointer.name} className={pointer.name === "id" ? ID_COLUMN_CLASS : undefined} style={pointer.name === "id" ? undefined : {width: COLUMN_DEFAULT_WIDTH}} />;
+          })}
+        </colgroup>
         <thead className="sticky top-0 z-10 bg-header">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
-              <th className="sticky left-0 z-20 w-10 border-b border-border bg-header px-2 py-1.5 text-fg-muted">
+              <th className="sticky left-0 z-20 border-b border-border bg-header px-2 py-1.5 text-fg-muted shadow-[var(--shadow-sticky-col)] md:shadow-none">
                 <Menu size={12} strokeWidth={1.75} />
               </th>
               {linkEditMode?.throughPointers?.map((tp) => (
-                <th key={`@${tp.name}`} className="w-28 border-b border-border px-2 py-1.5 text-left font-mono whitespace-nowrap">
+                <th key={`@${tp.name}`} className="relative border-b border-border px-2 py-1.5 text-left font-mono whitespace-nowrap">
                   <div className="truncate font-[450] text-2sm text-fg">@{tp.name}</div>
                   {tp.typeName && <div className="truncate text-2xs font-normal text-fg-muted">{tp.typeName}</div>}
+                  <div
+                    onMouseDown={startResize(`@${tp.name}`)}
+                    className="absolute inset-y-0 right-0 w-1 cursor-col-resize select-none hover:bg-accent/50 active:bg-accent"
+                  />
                 </th>
               ))}
               {headerGroup.headers.map((header) => {
@@ -190,8 +248,16 @@ export const DataGrid: React.FC<DataGridProps> = ({
                   <th
                     key={header.id}
                     className={clsx(
-                      "max-w-60 border-b border-border px-2 py-1.5 text-left font-mono whitespace-nowrap",
-                      pointer.name === "id" && "sticky left-10 z-20 bg-header"
+                      "relative border-b border-border px-2 py-1.5 text-left font-mono whitespace-nowrap",
+                      // Sticky on desktop so id stays visible while scrolling
+                      // horizontally; on narrow (mobile) widths it eats too
+                      // much of the already-tight viewport, so it scrolls
+                      // with the rest of the row there instead. The pinned-
+                      // column shadow moves to the gutter in that case (see
+                      // its own className above) since id is then the one
+                      // scrolling normally.
+                      pointer.name === "id" &&
+                        "sticky left-10 z-20 bg-header shadow-[var(--shadow-sticky-col)] max-md:static max-md:left-auto max-md:z-auto max-md:shadow-none"
                     )}
                   >
                     <button
@@ -218,6 +284,10 @@ export const DataGrid: React.FC<DataGridProps> = ({
                           <ArrowUpDown size={14} className="shrink-0 text-fg-muted" />
                         ))}
                     </button>
+                    <div
+                      onMouseDown={startResize(pointer.name)}
+                      className="absolute inset-y-0 right-0 w-1 cursor-col-resize select-none hover:bg-accent/50 active:bg-accent"
+                    />
                   </th>
                 );
               })}
@@ -274,7 +344,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
               >
                 <td
                   className={clsx(
-                    "sticky left-0 w-10 border-b border-l-2 bg-surface px-2 py-2.5 text-right font-mono text-xs text-fg-muted group-hover/row:bg-surface-hover",
+                    "sticky left-0 border-b border-l-2 bg-surface px-2 py-2.5 text-right font-mono text-xs text-fg-muted shadow-[var(--shadow-sticky-col)] group-hover/row:bg-surface-hover md:shadow-none",
                     isInsertRow ? "border-b-border border-l-green-500" : isDeletedRow ? "border-b-border border-l-red-500" : "border-border border-l-transparent"
                   )}
                 >
@@ -329,8 +399,9 @@ export const DataGrid: React.FC<DataGridProps> = ({
                         startEditingCell({objectId, objectTypeName: pylonType, pointerName: pointer.name});
                       }}
                       className={clsx(
-                        "max-w-60 overflow-hidden border-b border-border px-2 py-2.5 font-mono text-ellipsis whitespace-nowrap",
-                        pointer.name === "id" && "sticky left-10 bg-surface group-hover/row:bg-surface-hover",
+                        "overflow-hidden border-b border-border px-2 py-2.5 font-mono text-ellipsis whitespace-nowrap",
+                        pointer.name === "id" &&
+                          "sticky left-10 bg-surface shadow-[var(--shadow-sticky-col)] group-hover/row:bg-surface-hover max-md:static max-md:left-auto max-md:shadow-none",
                         isLink && "cursor-pointer"
                       )}
                     >

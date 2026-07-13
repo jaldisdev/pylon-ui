@@ -41,6 +41,11 @@
      layers */
   --shadow-card: 0 0 8px rgba(0, 0, 0, 0.04), 0 0 4px rgba(0, 0, 0, 0.06);
 
+  /* Rightward-only shadow marking the edge of a `sticky left-*` column (the
+     Data Explorer grid's gutter/id columns) — matching Gel's own pinned-
+     column seam. */
+  --shadow-sticky-col: 4px 0 6px -4px rgba(0, 0, 0, 0.15);
+
   /* PyQL syntax highlighting, used by src/lib/editor/theme.ts */
   --syntax-keyword: var(--color-indigo-600);
   --syntax-string: var(--color-green-600);
@@ -66,6 +71,7 @@
   --color-tooltip: #adadad;
   --color-tooltip-fg: #141414;
   --shadow-card: 0 0 8px rgba(0, 0, 0, 0.2), 0 0 4px rgba(0, 0, 0, 0.3);
+  --shadow-sticky-col: 4px 0 6px -4px rgba(0, 0, 0, 0.5);
 
   --syntax-keyword: var(--color-violet-400);
   --syntax-string: var(--color-green-400);
