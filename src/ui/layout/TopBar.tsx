@@ -9,6 +9,7 @@ import {useConnections} from "@/lib/api/useConnections";
 import {useTheme, type Theme} from "@/lib/theme/useTheme";
 import {GlobalsModal} from "@/features/globals/GlobalsModal";
 import {ConnectionMenu} from "@/ui/layout/ConnectionMenu";
+import {ShortcutsModal} from "@/ui/layout/ShortcutsModal";
 import {Tooltip} from "@/ui/Tooltip";
 
 const THEME_ORDER: Theme[] = ["light", "dark", "system"];
@@ -25,6 +26,7 @@ export const TopBar: React.FC = () => {
   const {data: connections} = useConnections();
   const {theme, setTheme} = useTheme();
   const [globalsModalOpen, setGlobalsModalOpen] = useState(false);
+  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
 
   // Mod+, alone is intercepted by Safari/Chrome at the OS-menu level for the
   // *browser's own* Preferences before it ever reaches page JS — no
@@ -40,6 +42,28 @@ export const TopBar: React.FC = () => {
     (event) => {
       event.preventDefault();
       setGlobalsModalOpen(true);
+    },
+    {enableOnContentEditable: true, enableOnFormTags: true, eventListenerOptions: {capture: true}}
+  );
+
+  // Cycles light -> dark -> system -> light, same order as the expanding
+  // icon menu itself.
+  useHotkeys(
+    "mod+shift+l",
+    (event) => {
+      event.preventDefault();
+      setTheme(THEME_ORDER[(THEME_ORDER.indexOf(theme) + 1) % THEME_ORDER.length]);
+    },
+    {enableOnContentEditable: true, enableOnFormTags: true, eventListenerOptions: {capture: true}}
+  );
+
+  // "/" matches its physical key (KeyboardEvent.code "Slash"), same as
+  // "comma" above — not the literal "/" character.
+  useHotkeys(
+    "mod+shift+slash",
+    (event) => {
+      event.preventDefault();
+      setShortcutsModalOpen((o) => !o);
     },
     {enableOnContentEditable: true, enableOnFormTags: true, eventListenerOptions: {capture: true}}
   );
@@ -126,6 +150,7 @@ export const TopBar: React.FC = () => {
         </div>
       </div>
       {globalsModalOpen && <GlobalsModal onClose={() => setGlobalsModalOpen(false)} />}
+      {shortcutsModalOpen && <ShortcutsModal onClose={() => setShortcutsModalOpen(false)} />}
     </header>
   );
 };

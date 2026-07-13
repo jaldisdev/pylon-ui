@@ -1,6 +1,7 @@
 import type React from "react";
 import {useMemo, useState} from "react";
 import {useQueryClient} from "@tanstack/react-query";
+import {useHotkeys} from "react-hotkeys-hook";
 
 import {api} from "@/lib/api/client";
 import {useSchema} from "@/lib/api/useSchema";
@@ -43,12 +44,14 @@ export const ReviewEditsModal: React.FC<ReviewEditsModalProps> = ({onClose}) => 
     [propertyEdits, linkEdits, insertEdits, deleteEdits, schema]
   );
 
-  if (!generated) return null;
-
-  const hasErrors = !!generated.error || generated.statements.some((s) => s.error);
+  // hasErrors/onCommit/onClearAll are plain consts, not hooks, but still
+  // defined ahead of the early return below so useHotkeys (itself a hook,
+  // and so unconditional-call-order-sensitive) can reference onCommit —
+  // null-safe since `generated` may not exist yet on this render.
+  const hasErrors = !!generated?.error || (generated?.statements.some((s) => s.error) ?? false);
 
   const onCommit = async () => {
-    if (!generated.finalQuery || hasErrors) return;
+    if (!generated?.finalQuery || hasErrors) return;
     setCommitting(true);
     setCommitError(null);
     try {
@@ -69,6 +72,19 @@ export const ReviewEditsModal: React.FC<ReviewEditsModalProps> = ({onClose}) => 
     clearAllPendingEdits();
     onClose();
   };
+
+  // DataExplorerTab's own Mod+S opens this modal; pressing it again while
+  // already open commits instead, mirroring Gel's own Review Changes modal.
+  useHotkeys(
+    "mod+s",
+    (event) => {
+      event.preventDefault();
+      if (!committing) onCommit();
+    },
+    {enableOnContentEditable: true, enableOnFormTags: true, eventListenerOptions: {capture: true}}
+  );
+
+  if (!generated) return null;
 
   // Output
   return (
