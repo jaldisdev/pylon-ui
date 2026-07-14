@@ -287,6 +287,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
             if (resized !== undefined) return <col key={pointer.name} style={{width: resized}} />;
             return <col key={pointer.name} className={pointer.name === "id" ? ID_COLUMN_CLASS : undefined} style={pointer.name === "id" ? undefined : {width: COLUMN_DEFAULT_WIDTH}} />;
           })}
+          <col />
         </colgroup>
         <thead className="sticky top-0 z-10 bg-header">
           {table.getHeaderGroups().map((headerGroup) => (
@@ -359,6 +360,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                   </th>
                 );
               })}
+              <th className="border-b border-border bg-header" />
             </tr>
           ))}
         </thead>
@@ -546,6 +548,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     </td>
                   );
                 })}
+                <td className="border-b border-border group-hover/row:bg-surface-hover" />
               </tr>
             );
           })}
