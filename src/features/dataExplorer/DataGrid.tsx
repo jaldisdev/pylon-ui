@@ -1,7 +1,8 @@
 import type React from "react";
 import {useEffect, useMemo, useRef, useState} from "react";
 import clsx from "clsx";
-import {useVirtualizer} from "@tanstack/react-virtual";
+import toast from 'react-hot-toast';
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, Link2, Menu, Trash2, Undo2} from "lucide-react";
 
 import type {SchemaPointer, SchemaResponse} from "@/lib/api/client";
@@ -284,7 +285,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const totalContentWidth = pinnedWidth + columnVirtualizer.getTotalSize();
 
   const renderHeaderCellContent = (col: GridColumn) => {
-    if (col.kind === "gutter") return <Menu size={12} strokeWidth={1.75} className="text-fg-muted" />;
+    if (col.kind === "gutter") return <Menu size={16} strokeWidth={2.25} className="text-fg-muted" />;
     if (col.kind === "through") {
       return (
         <>
@@ -338,8 +339,8 @@ export const DataGrid: React.FC<DataGridProps> = ({
               <div
                 key={columnKey(col)}
                 role="columnheader"
-                className="relative h-full shrink-0 px-2 py-1.5 font-mono whitespace-nowrap"
-                style={{width: columnWidth(col)}}
+                className={clsx("relative h-full shrink-0 px-2 py-1.5 font-mono whitespace-nowrap", col.kind === "gutter" && "flex items-center justify-center")}
+                style={{ width: columnWidth(col) }}
               >
                 {renderHeaderCellContent(col)}
                 {col.kind !== "gutter" && (
@@ -358,7 +359,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 key={columnKey(col)}
                 role="columnheader"
                 className="absolute top-0 h-full px-2 py-1.5 font-mono whitespace-nowrap"
-                style={{left: pinnedWidth + vc.start, width: vc.size}}
+                style={{ left: pinnedWidth + vc.start, width: vc.size }}
               >
                 {renderHeaderCellContent(col)}
                 <div
@@ -391,6 +392,13 @@ export const DataGrid: React.FC<DataGridProps> = ({
               }
             }
 
+            const onCopyToClipboard = (value: string) => {
+              if (!value) return;
+
+              navigator.clipboard.writeText(value).then(() => {
+                toast.success('Copied ID to clipboard');
+              });
+            };
             const onToggleDelete = () => {
               if (isInsertRow) removeInsertedRow(objectId as number);
               else toggleRowDelete(objectId as string, pylonType);
@@ -431,8 +439,14 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     else onNavigateLink(displayRow.kind === "fetched" ? displayRow.row : {}, pointer);
                   }}
                   onDoubleClick={() => {
-                    if (!cellEditable) return;
-                    startEditingCell({objectId, objectTypeName: pylonType, pointerName: pointer.name});
+                    if (!cellEditable && pointer.name !== 'id') return;
+                    if (pointer.name === 'id') {
+                      if (typeof displayValue === "string") {
+                        onCopyToClipboard(displayValue);
+                      }
+                    } else {
+                      startEditingCell({objectId, objectTypeName: pylonType, pointerName: pointer.name});
+                    }
                   }}
                   className={clsx(
                     "h-full shrink-0 font-mono",
@@ -488,7 +502,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                               }}
                               className="text-orange-500 hover:text-orange-400"
                             >
-                              <Undo2 size={11} strokeWidth={1.75} />
+                              <Undo2 size={14} strokeWidth={1.75} />
                             </button>
                           )}
                         </span>

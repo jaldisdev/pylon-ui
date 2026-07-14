@@ -1,6 +1,7 @@
 import type React from "react";
 import {QueryClientProvider} from "@tanstack/react-query";
-import {Navigate, Route, BrowserRouter, Routes} from "react-router-dom";
+import { Navigate, Route, BrowserRouter, Routes } from "react-router-dom";
+import { Toaster } from 'react-hot-toast';
 
 import { AiTab } from "@/features/ai/AiTab";
 import { DashboardTab } from "@/features/dashboard/DashboardTab";
@@ -30,6 +31,8 @@ const App: React.FC = () => (
           <Route path="*" element={<Navigate to="/main/repl" replace />} />
         </Routes>
       </BrowserRouter>
+
+      <Toaster position="top-right" />
     </ThemeProvider>
   </QueryClientProvider>
 );
