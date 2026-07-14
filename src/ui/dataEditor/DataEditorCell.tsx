@@ -66,6 +66,15 @@ export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, 
     onCommit(value);
   };
 
+  // Passed down to TextEditor as its "click outside commits" boundary —
+  // must span the *whole* cell (this root), not just TextEditor's own input
+  // wrapper: the "unset" button below is a sibling of that wrapper, so a
+  // click on it would otherwise register as "outside," committing/discarding
+  // the text value on mousedown (capture phase, before the button's own
+  // click) and unmounting this whole cell before the button's click ever
+  // fires.
+  const rootRef = useRef<HTMLDivElement>(null);
+
   // flex + items-stretch is what reliably fills the cell's full height (a
   // plain block chain of nested `h-full`s is fragile — percentage heights
   // don't cascade dependably through several stacked levels inside a table
@@ -79,6 +88,7 @@ export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, 
   // the cell.
   return (
     <div
+      ref={rootRef}
       className="relative flex h-full items-stretch"
       onKeyDown={(e) => {
         if (e.key === "Escape") {
@@ -119,7 +129,7 @@ export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, 
         ) : pointer.typeName === "std::bool" ? (
           <BoolEditor initialValue={initialValue} onCommit={commitIfChanged} />
         ) : (
-          <TextEditor pointer={pointer} initialValue={initialValue} onCommit={commitIfChanged} />
+          <TextEditor pointer={pointer} initialValue={initialValue} onCommit={commitIfChanged} boundaryRef={rootRef} />
         )}
       </div>
       {/* Optional pointers get an explicit "clear to {}" action, matching
@@ -139,6 +149,14 @@ export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, 
         <button
           type="button"
           title="Set to {}"
+          // Without this, mousedown on the button blurs the still-focused
+          // text input first — TextEditor's onBlur-commit fires with the
+          // (unchanged) typed value, discards, and unmounts this whole cell
+          // (button included) before the button's own click ever reaches
+          // its onClick. preventDefault on mousedown stops the browser from
+          // shifting focus off the input at all, so no premature blur/
+          // discard happens before the real click runs.
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => commitIfChanged({valid: true, value: null})}
           className="absolute inset-y-0 right-0 z-10 flex translate-x-full items-center justify-center rounded-r-md bg-orange-500 px-2 font-mono text-2sm font-medium text-white hover:opacity-90 dark:bg-orange-600"
         >
@@ -204,8 +222,13 @@ const TextEditor: React.FC<{
   pointer: SchemaPointer;
   initialValue: unknown;
   onCommit: (value: EditValue) => void;
-}> = ({pointer, initialValue, onCommit}) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+  // The whole cell's own boundary (from DataEditorCell), not just this
+  // component's own wrapper — a click on the sibling "unset" button must
+  // count as "inside" too, or it gets treated as a click-outside-commits
+  // before the button's own click ever fires. See DataEditorCell's own
+  // comment on rootRef for the full mousedown/click ordering explanation.
+  boundaryRef: React.RefObject<HTMLDivElement | null>;
+}> = ({pointer, initialValue, onCommit, boundaryRef}) => {
   const castType = pointer.typeName ?? null;
   const isMultiline = castType === "std::str" || castType === "std::json";
   const latestRef = useRef<EditValue>(toEditValue(valueToRawText(initialValue), castType));
@@ -213,13 +236,13 @@ const TextEditor: React.FC<{
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (!containerRef.current || containerRef.current.contains(e.target as Node) || committedRef.current) return;
+      if (!boundaryRef.current || boundaryRef.current.contains(e.target as Node) || committedRef.current) return;
       committedRef.current = true;
       onCommit(latestRef.current);
     };
     document.addEventListener("mousedown", handler, true);
     return () => document.removeEventListener("mousedown", handler, true);
-  }, [onCommit]);
+  }, [onCommit, boundaryRef]);
 
   const commit = () => {
     if (committedRef.current) return;
@@ -235,7 +258,7 @@ const TextEditor: React.FC<{
   };
 
   return (
-    <div ref={containerRef} className="h-full w-full">
+    <div className="h-full w-full">
       <ScalarMemberInput
         dense
         autoFocus
