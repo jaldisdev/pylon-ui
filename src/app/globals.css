@@ -102,7 +102,9 @@
 
   --font-sans: "Roboto Flex Variable", "Roboto", sans-serif;
   --font-mono: "Roboto Mono Variable", "Roboto Mono", monospace;
+}
 
+@theme {
   --text-2sm: 0.8rem;
   --text-2xs: 0.625rem;
 }

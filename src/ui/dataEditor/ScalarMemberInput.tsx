@@ -171,7 +171,7 @@ export const ScalarMemberInput: React.FC<ScalarMemberInputProps> = ({
       {showTag && (
         <span
           className={clsx(
-            "absolute top-1 right-1 rounded px-1.5 py-0.5 text-2xs font-medium",
+            "absolute top-1 right-1 rounded px-1.5 py-0.5 leading-3 text-2xs font-medium",
             error ? "bg-(--syntax-operator) text-white" : "bg-surface-active text-fg-muted"
           )}
         >
