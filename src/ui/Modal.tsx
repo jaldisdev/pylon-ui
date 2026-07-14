@@ -33,7 +33,7 @@ export const Modal: React.FC<ModalProps> = ({title, onClose, children, size = "m
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className={`flex max-h-[80vh] flex-col overflow-hidden rounded-xl bg-surface shadow-[var(--shadow-card)] ${SIZE_CLASSES[size]}`}
+        className={`flex max-h-[80vh] flex-col overflow-hidden rounded-xl bg-surface shadow-(--shadow-card) ${SIZE_CLASSES[size]}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-header px-4">

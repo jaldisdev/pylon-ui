@@ -42,7 +42,7 @@ export const ScalarValue: React.FC<ScalarValueProps> = ({value, typeTag, compact
         {members.map((m, i) => (
           <span key={m.name ?? i}>
             {i > 0 && ", "}
-            {m.name !== null && <span className="text-[var(--syntax-name)]">{m.name} := </span>}
+            {m.name !== null && <span className="text-(--syntax-name)">{m.name} := </span>}
             <ScalarValue
               value={memberValue(m, i)}
               typeTag={schema ? memberTypeTag(m, schema) : null}
@@ -82,17 +82,17 @@ export const ScalarValue: React.FC<ScalarValueProps> = ({value, typeTag, compact
     return (
       <span>
         {tag}
-        <span className="text-[var(--syntax-string)]">
+        <span className="text-(--syntax-string)">
           {compact ? value : `'${value}'`}
         </span>
       </span>
     );
   }
   if (typeof value === "number") {
-    return <span className="text-[var(--syntax-number)]">{value}</span>;
+    return <span className="text-(--syntax-number)">{value}</span>;
   }
   if (typeof value === "boolean") {
-    return <span className="text-[var(--syntax-number)]">{String(value)}</span>;
+    return <span className="text-(--syntax-number)">{String(value)}</span>;
   }
   if (Array.isArray(value)) {
     // Per-element type tag when this array's own element type is known

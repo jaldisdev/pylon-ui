@@ -60,7 +60,7 @@ export const ObjectTypeSelect: React.FC<ObjectTypeSelectProps> = ({types, select
         <ChevronDown size={14} strokeWidth={1.75} className="text-fg-muted" />
       </button>
       {open && (
-        <div className="absolute top-full left-0 z-30 mt-1 max-h-80 w-64 overflow-hidden rounded-md border border-border bg-surface shadow-[var(--shadow-card)]">
+        <div className="absolute top-full left-0 z-30 mt-1 max-h-80 w-64 overflow-hidden rounded-md border border-border bg-surface shadow-(--shadow-card)">
           <input
             autoFocus
             type="text"

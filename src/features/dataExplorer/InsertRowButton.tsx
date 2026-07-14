@@ -68,7 +68,7 @@ const InsertTypeDropdown: React.FC<{options: SchemaType[]; onInsert: (concreteTy
         <ChevronDown size={12} strokeWidth={1.75} />
       </button>
       {open && (
-        <div className="absolute top-full left-0 z-30 mt-1 w-48 overflow-hidden rounded-md border border-border bg-surface shadow-[var(--shadow-card)]">
+        <div className="absolute top-full left-0 z-30 mt-1 w-48 overflow-hidden rounded-md border border-border bg-surface shadow-(--shadow-card)">
           {options.map((type) => (
             <button
               key={qualname(type)}

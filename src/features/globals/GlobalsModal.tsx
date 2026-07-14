@@ -253,7 +253,7 @@ export const GlobalsModal: React.FC<GlobalsModalProps> = ({onClose}) => {
                     title={enabled ? "Active — sent with every query" : "Inactive — kept, but not sent"}
                   />
                   {key}
-                  {g.required && <span className="text-[var(--syntax-operator)]">*</span>}
+                  {g.required && <span className="text-(--syntax-operator)">*</span>}
                   {g.typeName && <span className="opacity-70">— {g.typeName}</span>}
                 </div>
                 {tupleMembers && schema ? (
@@ -291,7 +291,7 @@ export const GlobalsModal: React.FC<GlobalsModalProps> = ({onClose}) => {
                     onChange={(nextRaw) => setDrafts((prev) => ({...prev, [key]: nextRaw}))}
                   />
                 )}
-                {error && <div className="mt-1 text-xs text-[var(--syntax-operator)]">{error}</div>}
+                {error && <div className="mt-1 text-xs text-(--syntax-operator)">{error}</div>}
               </div>
             );
           })}

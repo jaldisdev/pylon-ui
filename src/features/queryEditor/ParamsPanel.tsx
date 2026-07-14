@@ -126,7 +126,7 @@ export const ParamsPanel: React.FC<ParamsPanelProps> = ({params, values, errors,
                     onChange={(nextRaw) => onChange(param.name, nextRaw)}
                   />
                 )}
-                {error && <div className="mt-1 text-2xs text-[var(--syntax-operator)]">{error}</div>}
+                {error && <div className="mt-1 text-2xs text-(--syntax-operator)">{error}</div>}
               </div>
             </div>
           );

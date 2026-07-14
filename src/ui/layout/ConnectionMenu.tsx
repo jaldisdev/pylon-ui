@@ -37,7 +37,7 @@ export const ConnectionMenu: React.FC = () => {
         <DropdownMenu.Content
           align="start"
           sideOffset={6}
-          className="z-50 min-w-36 rounded-md border border-border bg-surface p-1 shadow-[var(--shadow-card)]"
+          className="z-50 min-w-36 rounded-md border border-border bg-surface p-1 shadow-(--shadow-card)"
         >
           {connections.map((name) => (
             <DropdownMenu.Item

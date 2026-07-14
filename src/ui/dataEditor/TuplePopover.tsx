@@ -67,7 +67,7 @@ export const TuplePopover: React.FC<TuplePopoverProps> = ({members, schema, init
               commit();
             }
           }}
-          className="z-50 min-w-64 rounded-md border border-border bg-surface p-1 shadow-[var(--shadow-card)]"
+          className="z-50 min-w-64 rounded-md border border-border bg-surface p-1 shadow-(--shadow-card)"
         >
           {optional && (
             <div className="mb-1 flex justify-end">

@@ -279,7 +279,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
         <thead className="sticky top-0 z-10 bg-header">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
-              <th className="sticky left-0 z-20 border-b border-border bg-header px-2 py-1.5 text-fg-muted shadow-[var(--shadow-sticky-col)] md:shadow-none">
+              <th className="sticky left-0 z-20 border-b border-border bg-header px-2 py-1.5 text-fg-muted shadow-(--shadow-sticky-col) md:shadow-none">
                 <Menu size={12} strokeWidth={1.75} />
               </th>
               {linkEditMode?.throughPointers?.map((tp) => (
@@ -309,7 +309,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                       // its own className above) since id is then the one
                       // scrolling normally.
                       pointer.name === "id" &&
-                        "sticky left-10 z-20 bg-header shadow-[var(--shadow-sticky-col)] max-md:static max-md:left-auto max-md:z-auto max-md:shadow-none"
+                        "sticky left-10 z-20 bg-header shadow-(--shadow-sticky-col) max-md:static max-md:left-auto max-md:z-auto max-md:shadow-none"
                     )}
                   >
                     <button
@@ -397,7 +397,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 <td
                   style={{height: ROW_HEIGHT}}
                   className={clsx(
-                    "sticky left-0 overflow-hidden border-b border-l-2 bg-surface px-2 py-2.5 text-right font-mono text-xs text-fg-muted shadow-[var(--shadow-sticky-col)] group-hover/row:bg-surface-hover md:shadow-none",
+                    "sticky left-0 overflow-hidden border-b border-l-2 bg-surface px-2 py-2.5 text-right font-mono text-xs text-fg-muted shadow-(--shadow-sticky-col) group-hover/row:bg-surface-hover md:shadow-none",
                     isInsertRow ? "border-b-border border-l-green-500" : isDeletedRow ? "border-b-border border-l-red-500" : "border-border border-l-transparent"
                   )}
                 >
@@ -469,7 +469,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                         // against vertically.
                         isEditing ? "p-0" : "overflow-hidden px-2 py-2.5",
                         pointer.name === "id" &&
-                          "sticky left-10 bg-surface shadow-[var(--shadow-sticky-col)] group-hover/row:bg-surface-hover max-md:static max-md:left-auto max-md:shadow-none",
+                          "sticky left-10 bg-surface shadow-(--shadow-sticky-col) group-hover/row:bg-surface-hover max-md:static max-md:left-auto max-md:shadow-none",
                         isLink && "cursor-pointer",
                         // Hints a cell is double-click-editable before the
                         // user commits to it, matching Gel's own hover state
@@ -582,7 +582,7 @@ const GutterCell: React.FC<GutterCellProps> = ({
         type={linkSingle ? "radio" : "checkbox"}
         checked={linkChecked}
         onChange={onToggleLink}
-        className="cursor-pointer accent-[var(--color-accent)]"
+        className="cursor-pointer accent-(--color-accent)"
       />
     );
   }

@@ -129,7 +129,7 @@ export const ScalarMemberInput: React.FC<ScalarMemberInputProps> = ({
     // it at ROW_HEIGHT regardless.
     dense ? "h-full px-2 text-2sm leading-[40px]" : "h-10 px-2.5 text-sm",
     showTag && "pr-14",
-    error ? "border-[var(--syntax-operator)]" : "border-border focus:border-accent"
+    error ? "border-(--syntax-operator)" : "border-border focus:border-accent"
   );
 
   const commit = (next: string) => {
@@ -172,7 +172,7 @@ export const ScalarMemberInput: React.FC<ScalarMemberInputProps> = ({
         <span
           className={clsx(
             "absolute top-1 right-1 rounded px-1.5 py-0.5 text-2xs font-medium",
-            error ? "bg-[var(--syntax-operator)] text-white" : "bg-surface-active text-fg-muted"
+            error ? "bg-(--syntax-operator) text-white" : "bg-surface-active text-fg-muted"
           )}
         >
           {castType}

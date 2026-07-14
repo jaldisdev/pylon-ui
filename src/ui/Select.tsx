@@ -54,7 +54,7 @@ export const Select: React.FC<Props> = ({dense, ...props}) => (
       input: () => "text-fg",
       indicatorSeparator: () => "hidden",
       dropdownIndicator: () => "text-fg-muted px-1",
-      menu: () => "mt-1 rounded-md border border-border bg-surface shadow-[var(--shadow-card)] overflow-hidden",
+      menu: () => "mt-1 rounded-md border border-border bg-surface shadow-(--shadow-card) overflow-hidden",
       menuList: () => "p-1 max-h-60",
       option: ({isFocused, isSelected}) =>
         clsx(

@@ -90,7 +90,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({label, value, schema, parentPylonTyp
     return (
       <div className="group/row flex items-center rounded pl-4 hover:bg-surface-hover">
         <div className="flex-1">
-          {label !== undefined && <span className="text-[var(--syntax-name)]">{label}: </span>}
+          {label !== undefined && <span className="text-(--syntax-name)">{label}: </span>}
           <ScalarValue value={value} typeTag={valueShapeToPointerTypeTag(valueShape, schema)} schema={schema} />
         </div>
         <CopyButton value={value} />
@@ -114,7 +114,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({label, value, schema, parentPylonTyp
               size={12}
               className={clsx("shrink-0 text-fg-muted transition-transform", open && "rotate-90")}
             />
-            {label !== undefined && <span className="text-[var(--syntax-name)]">{label}: </span>}
+            {label !== undefined && <span className="text-(--syntax-name)">{label}: </span>}
             {pylonType && <span className="text-fg-muted">{pylonType} </span>}
             <span className="text-fg-muted">
               {isArray ? "[" : "{"}
@@ -153,7 +153,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({label, value, schema, parentPylonTyp
   return (
     <div className="group/row flex items-center rounded pl-4 hover:bg-surface-hover">
       <div className="flex-1">
-        {label !== undefined && <span className="text-[var(--syntax-name)]">{label}: </span>}
+        {label !== undefined && <span className="text-(--syntax-name)">{label}: </span>}
         <ScalarValue value={value} typeTag={typeTag} schema={schema} />
       </div>
       <CopyButton value={value} />
