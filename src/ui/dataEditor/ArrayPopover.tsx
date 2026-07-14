@@ -27,10 +27,19 @@ export const ArrayPopover: React.FC<ArrayPopoverProps> = ({element, schema, init
   const draftRef = useRef(draft);
   draftRef.current = draft;
   const resolvedRef = useRef(false);
+  // A null/undefined initialValue seeds `draft` as [] (so ArrayEditor has
+  // something to render), not left as null — closing without ever adding an
+  // item would otherwise commit [] instead of leaving the property unset,
+  // since it no longer looks equal to the original null.
+  const touchedRef = useRef(false);
 
   const commit = () => {
     if (resolvedRef.current) return;
     resolvedRef.current = true;
+    if (!touchedRef.current) {
+      onDiscard();
+      return;
+    }
     onCommit({valid: true, value: draftRef.current});
   };
   const discard = () => {
@@ -52,7 +61,11 @@ export const ArrayPopover: React.FC<ArrayPopoverProps> = ({element, schema, init
       <Popover.Portal>
         <Popover.Content
           align="start"
-          sideOffset={4}
+          // Shifts the popover up by the grid row's own height (see
+          // DataGrid.tsx's ROW_HEIGHT) so it overlays the cell from its top
+          // edge instead of floating below a now-blank collapsed cell —
+          // matching Gel's own tuple/array editor placement.
+          sideOffset={-42}
           onEscapeKeyDown={discard}
           onPointerDownOutside={commit}
           onKeyDown={(e) => {
@@ -75,7 +88,15 @@ export const ArrayPopover: React.FC<ArrayPopoverProps> = ({element, schema, init
               </button>
             </div>
           )}
-          <ArrayEditor element={element} schema={schema} value={draft} onChange={setDraft} />
+          <ArrayEditor
+            element={element}
+            schema={schema}
+            value={draft}
+            onChange={(next) => {
+              touchedRef.current = true;
+              setDraft(next);
+            }}
+          />
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

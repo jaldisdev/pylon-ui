@@ -33,10 +33,20 @@ export const TuplePopover: React.FC<TuplePopoverProps> = ({members, schema, init
   const draftRef = useRef(draft);
   draftRef.current = draft;
   const resolvedRef = useRef(false);
+  // A null/undefined initialValue seeds `draft` with a real default (so
+  // TupleEditor has member values to render), not left as null — closing
+  // without ever touching a member would otherwise commit that default
+  // instead of leaving the property unset, since it no longer looks equal
+  // to the original null.
+  const touchedRef = useRef(false);
 
   const commit = () => {
     if (resolvedRef.current) return;
     resolvedRef.current = true;
+    if (!touchedRef.current) {
+      onDiscard();
+      return;
+    }
     onCommit({valid: true, value: draftRef.current});
   };
   const discard = () => {
@@ -58,7 +68,11 @@ export const TuplePopover: React.FC<TuplePopoverProps> = ({members, schema, init
       <Popover.Portal>
         <Popover.Content
           align="start"
-          sideOffset={4}
+          // Shifts the popover up by the grid row's own height (see
+          // DataGrid.tsx's ROW_HEIGHT) so it overlays the cell from its top
+          // edge instead of floating below a now-blank collapsed cell —
+          // matching Gel's own tuple/array editor placement.
+          sideOffset={-42}
           onEscapeKeyDown={discard}
           onPointerDownOutside={commit}
           onKeyDown={(e) => {
@@ -81,7 +95,15 @@ export const TuplePopover: React.FC<TuplePopoverProps> = ({members, schema, init
               </button>
             </div>
           )}
-          <TupleEditor members={members} schema={schema} value={draft} onChange={setDraft} />
+          <TupleEditor
+            members={members}
+            schema={schema}
+            value={draft}
+            onChange={(next) => {
+              touchedRef.current = true;
+              setDraft(next);
+            }}
+          />
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
