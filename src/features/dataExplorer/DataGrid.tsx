@@ -3,13 +3,15 @@ import {useEffect, useMemo, useRef, useState} from "react";
 import clsx from "clsx";
 import toast from 'react-hot-toast';
 import { useVirtualizer } from "@tanstack/react-virtual";
-import {ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, Link2, Menu, Trash2, Undo2} from "lucide-react";
+import {useQuery} from "@tanstack/react-query";
+import {ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, ChevronRight, Link2, Menu, Trash2, Undo2} from "lucide-react";
 
-import type {SchemaPointer, SchemaResponse} from "@/lib/api/client";
+import {api, type SchemaPointer, type SchemaResponse, type SchemaType} from "@/lib/api/client";
 import {isSelfOrDescendant, qualname} from "@/lib/schema/inheritance";
 import {lookupPointerTypeTag} from "@/lib/schema/typeTags";
 import {formatTupleType} from "@/lib/schema/tupleTypeCast";
 import {useIsMobile} from "@/lib/hooks/useIsMobile";
+import {JsonTree} from "@/ui/JsonTree";
 import {ScalarValue} from "@/ui/ScalarValue";
 import {DataEditorCell} from "@/ui/dataEditor/DataEditorCell";
 import {LinkPropertyCell} from "@/ui/dataEditor/LinkPropertyCell";
@@ -89,7 +91,9 @@ const HEADER_HEIGHT = 44;
 // rather than each sticky cell being independently positioned.
 const STICKY_COL_SHADOW = "after:absolute after:top-0 after:-right-1.25 after:-bottom-px after:w-1 after:bg-linear-(--bg-sticky-col-fadeout) after:content-['']";
 
-const GUTTER_WIDTH = 40;
+// Wide enough for the row-number/delete-icon area plus a leading expand
+// chevron toggle (see GutterCell).
+const GUTTER_WIDTH = 56;
 const THROUGH_COLUMN_DEFAULT_WIDTH = 112;
 const COLUMN_DEFAULT_WIDTH = 180;
 const COLUMN_MIN_WIDTH = 60;
@@ -110,6 +114,38 @@ const isEditableCell = (pointer: SchemaPointer, isInsertRow: boolean) =>
 // A pending insert's temp id, or a fetched row's real uuid — same identity
 // DataEditsStore keys edits by (see ActivePropertyEdit.objectId).
 const rowObjectId = (row: DisplayRow): string | number => (row.kind === "insert" ? row.tempId : ((row.row.id as string | undefined) ?? ""));
+
+// Just this type's own scalar-ish pointers (no links) — used both for the
+// expanded row's own top-level shape and for a link target's one-level-deep
+// preview inside it.
+const scalarPointerNames = (pointers: SchemaPointer[]): string =>
+  pointers
+    .filter((p) => p.kind !== "link" && p.kind !== "multiLink")
+    .map((p) => `\`${p.name}\``)
+    .join(", ");
+
+// The row-expansion view's own query shape — every scalar property plus one
+// level of link/multi-link data (the target's own scalar properties only,
+// capped at 10 items for a multi-link, with a `__count_*` sibling for the
+// true total). Deliberately NOT a `**` deep splat: Pylon schemas can have
+// cyclic/self-referential links (e.g. Person.friends: MultiLink[Person]),
+// and a blind deep splat risks either runaway recursion or a very large
+// result depending on how well pylon-core's own cycle handling holds up —
+// matches gel-ui's own row-expansion inspector, which takes the same
+// one-level-plus-lazy-load approach rather than a blind full-depth fetch.
+const buildExpandedRowShape = (schemaType: SchemaType, schema: SchemaResponse): string =>
+  schemaType.pointers
+    .map((p) => {
+      if (p.kind !== "link" && p.kind !== "multiLink") return `\`${p.name}\``;
+      const [module, name] = (p.target ?? "").split("::");
+      const targetType = schema.types.find((t) => t.module === module && t.name === name);
+      const targetShape = targetType ? scalarPointerNames(targetType.pointers) : "id";
+      if (p.kind === "multiLink") {
+        return `\`${p.name}\`: { ${targetShape} } limit 10, \`__count_${p.name}\` := count(.\`${p.name}\`)`;
+      }
+      return `\`${p.name}\`: { ${targetShape} }`;
+    })
+    .join(", ");
 
 // Virtualized (rows *and* columns) data grid — a div-based rewrite of the old
 // <table>-based grid, matching Gel's own architecture: cells are absolutely
@@ -133,6 +169,21 @@ export const DataGrid: React.FC<DataGridProps> = ({
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+
+  // The expanded-row view's own content needs to stay within the visible
+  // viewport, not stretch out to the grid's full (horizontally scrollable)
+  // content width — otherwise its own flex-1 label pushes the "View
+  // objects" action out past the right edge, only visible once scrolled
+  // all the way over. Tracked via ResizeObserver rather than read once,
+  // since the panel itself can resize (window resize, sidebar toggle, ...).
+  const [viewportWidth, setViewportWidth] = useState(0);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => setViewportWidth(entries[0].contentRect.width));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Per-column widths (keyed by columnKey) — drag-resized via the handle on
   // each header's right edge; unset columns fall back to defaultColumnWidth.
@@ -197,6 +248,43 @@ export const DataGrid: React.FC<DataGridProps> = ({
     return all.filter((r) => (r.kind === "insert" ? r.tempId : ((r.row.id as string | undefined) ?? "")) !== linkEditMode.parentId);
   }, [insertEdits, pylonType, rows, linkEditMode, schema]);
 
+  // Row expansion (gel-ui style inline object inspector) — keyed by real
+  // object id, so only fetched rows (never pending inserts, which have no
+  // real id yet) can expand. Collapsing forgets it entirely (not just
+  // hiding it) so re-expanding the same row later refetches rather than
+  // showing stale data, matching gel-ui's own behavior.
+  const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(new Set());
+  const toggleRowExpanded = (objectId: string) =>
+    setExpandedRowIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(objectId)) next.delete(objectId);
+      else next.add(objectId);
+      return next;
+    });
+
+  // The actual rendered row sequence: each display row, plus (immediately
+  // after it) an extra "expansion" entry for any fetched row currently
+  // expanded — interleaved here rather than toggled via a per-row nested
+  // state, so it's just one more entry in the same virtualized list instead
+  // of a special case the virtualizer needs to know about.
+  type GridRowEntry = {kind: "data"; displayRow: DisplayRow} | {kind: "expansion"; objectId: string};
+  const gridRowEntries = useMemo<GridRowEntry[]>(() => {
+    const out: GridRowEntry[] = [];
+    for (const displayRow of displayRows) {
+      out.push({kind: "data", displayRow});
+      if (displayRow.kind === "fetched") {
+        const id = displayRow.row.id as string | undefined;
+        if (id && expandedRowIds.has(id)) out.push({kind: "expansion", objectId: id});
+      }
+    }
+    return out;
+  }, [displayRows, expandedRowIds]);
+  // moveToAdjacentEditableCell below computes positions in terms of
+  // `displayRows`, but the row virtualizer now indexes `gridRowEntries` —
+  // this converts one to the other for its scrollToIndex call.
+  const gridIndexForDisplayRow = (displayRow: DisplayRow) =>
+    gridRowEntries.findIndex((e) => e.kind === "data" && e.displayRow === displayRow);
+
   const allColumns = useMemo<GridColumn[]>(() => {
     const cols: GridColumn[] = [{kind: "gutter"}];
     for (const tp of linkEditMode?.throughPointers ?? []) cols.push({kind: "through", pointer: tp});
@@ -221,10 +309,24 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const pinnedWidth = pinnedColumns.reduce((sum, c) => sum + columnWidth(c), 0);
 
   const rowVirtualizer = useVirtualizer({
-    count: displayRows.length,
+    count: gridRowEntries.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_HEIGHT,
+    // An expansion entry's real height isn't known until its content
+    // renders (it depends on the fetched object's own shape) — this initial
+    // guess only matters for the first paint; measureElement (passed as
+    // this row's ref below) corrects it afterward.
+    estimateSize: (index) => (gridRowEntries[index].kind === "expansion" ? 160 : ROW_HEIGHT),
     overscan: 10,
+    // measureElement's cache is keyed by item identity — without this, it
+    // defaults to raw array index, so collapsing a row (which removes its
+    // expansion entry and shifts every later index down by one) makes each
+    // shifted row inherit whatever size was previously cached for that
+    // index rather than its own, leaving stale gaps behind.
+    getItemKey: (index) => {
+      const e = gridRowEntries[index];
+      if (e.kind === "expansion") return `expansion-${e.objectId}`;
+      return e.displayRow.kind === "insert" ? `insert-${e.displayRow.tempId}` : ((e.displayRow.row.id as string | undefined) ?? `row-${index}`);
+    },
   });
 
   const columnVirtualizer = useVirtualizer({
@@ -276,7 +378,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
       const candidatePointer = pointers[p];
       if (isEditableCell(candidatePointer, candidateRow.kind === "insert")) {
         startEditingCell({objectId: rowObjectId(candidateRow), objectTypeName: pylonType, pointerName: candidatePointer.name});
-        if (r !== rowIndex) rowVirtualizer.scrollToIndex(r, {align: "auto"});
+        if (r !== rowIndex) rowVirtualizer.scrollToIndex(gridIndexForDisplayRow(candidateRow), {align: "auto"});
         return;
       }
     }
@@ -372,7 +474,26 @@ export const DataGrid: React.FC<DataGridProps> = ({
         </div>
         <div className="relative w-full" style={{height: rowVirtualizer.getTotalSize()}}>
           {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-            const displayRow = displayRows[virtualRow.index];
+            const entry = gridRowEntries[virtualRow.index];
+            if (entry.kind === "expansion") {
+              return (
+                <div
+                  key={`expansion-${entry.objectId}`}
+                  ref={rowVirtualizer.measureElement}
+                  data-index={virtualRow.index}
+                  role="row"
+                  className="absolute left-0 w-full border-b border-border bg-surface"
+                  style={{top: virtualRow.start}}
+                >
+                  <div className="sticky left-0 bg-surface" style={{width: viewportWidth || "100%"}}>
+                    {schema && (
+                      <ExpandedRowContent objectId={entry.objectId} pylonType={pylonType} schema={schema} onNavigateLink={onNavigateLink} />
+                    )}
+                  </div>
+                </div>
+              );
+            }
+            const displayRow = entry.displayRow;
             const isInsertRow = displayRow.kind === "insert";
             const objectId = rowObjectId(displayRow);
             const isDeletedRow = !isInsertRow && deleteEdits.has(objectId as string);
@@ -548,6 +669,11 @@ export const DataGrid: React.FC<DataGridProps> = ({
                             rowIndex={virtualRow.index}
                             onToggleDelete={onToggleDelete}
                             onToggleLink={onToggleLink}
+                            canExpand={!isInsertRow && linkEditMode === undefined}
+                            expanded={typeof objectId === "string" && expandedRowIds.has(objectId)}
+                            onToggleExpand={() => {
+                              if (typeof objectId === "string") toggleRowExpanded(objectId);
+                            }}
                           />
                         </div>
                       );
@@ -601,6 +727,11 @@ interface GutterCellProps {
   rowIndex: number;
   onToggleDelete: () => void;
   onToggleLink: () => void;
+  // Row-expansion (inline object inspector) toggle — only offered for real,
+  // persisted rows outside link-edit mode (see the call site).
+  canExpand: boolean;
+  expanded: boolean;
+  onToggleExpand: () => void;
 }
 
 const GutterCell: React.FC<GutterCellProps> = ({
@@ -612,7 +743,11 @@ const GutterCell: React.FC<GutterCellProps> = ({
   rowIndex,
   onToggleDelete,
   onToggleLink,
+  canExpand,
+  expanded,
+  onToggleExpand,
 }) => {
+  let content: React.ReactNode;
   if (linkEditMode) {
     // A single-link's *checked* row can't be a plain radio: browsers never
     // fire onChange for a click on an already-checked radio (no state
@@ -620,8 +755,8 @@ const GutterCell: React.FC<GutterCellProps> = ({
     // unset. Once checked, it switches to a real button instead — clicking
     // it always fires, unlinking it — matching Gel's own solid "linked"
     // badge for this exact reason.
-    if (linkSingle && linkChecked) {
-      return (
+    content =
+      linkSingle && linkChecked ? (
         <button
           type="button"
           onClick={onToggleLink}
@@ -630,41 +765,107 @@ const GutterCell: React.FC<GutterCellProps> = ({
         >
           <Link2 size={12} strokeWidth={2} />
         </button>
+      ) : (
+        <input
+          type={linkSingle ? "radio" : "checkbox"}
+          checked={linkChecked}
+          onChange={onToggleLink}
+          className="cursor-pointer accent-(--color-accent)"
+        />
       );
-    }
-    return (
-      <input
-        type={linkSingle ? "radio" : "checkbox"}
-        checked={linkChecked}
-        onChange={onToggleLink}
-        className="cursor-pointer accent-(--color-accent)"
-      />
-    );
-  }
-  if (isInsertRow) {
-    return (
+  } else if (isInsertRow) {
+    content = (
       <button type="button" onClick={onToggleDelete} title="Remove" className="flex h-full w-full items-center justify-end text-fg-muted hover:text-red-500">
         <Trash2 size={16} strokeWidth={1.75} />
       </button>
     );
-  }
-  if (isDeletedRow) {
-    return (
+  } else if (isDeletedRow) {
+    content = (
       <button type="button" onClick={onToggleDelete} title="Undo delete" className="flex h-full w-full items-center justify-end text-fg-muted hover:text-fg">
         <Undo2 size={12} strokeWidth={1.75} />
       </button>
     );
+  } else {
+    content = (
+      <button
+        type="button"
+        onClick={onToggleDelete}
+        title="Delete"
+        className="group/gutter flex h-full w-full items-center justify-end text-fg-muted hover:text-red-500"
+      >
+        <span className="group-hover/gutter:hidden">{rowIndex + 1}</span>
+        <Trash2 size={16} strokeWidth={1.75} className="hidden group-hover/gutter:block" />
+      </button>
+    );
   }
+
   return (
-    <button
-      type="button"
-      onClick={onToggleDelete}
-      title="Delete"
-      className="group/gutter flex h-full w-full items-center justify-end text-fg-muted hover:text-red-500"
-    >
-      <span className="group-hover/gutter:hidden">{rowIndex + 1}</span>
-      <Trash2 size={16} strokeWidth={1.75} className="hidden group-hover/gutter:block" />
-    </button>
+    <div className="flex h-full w-full items-stretch gap-1">
+      {canExpand ? (
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          title={expanded ? "Collapse" : "Expand"}
+          className="flex w-4 shrink-0 items-center justify-center text-fg-muted hover:text-fg"
+        >
+          <ChevronRight size={12} strokeWidth={2} className={clsx("shrink-0 transition-transform", expanded && "rotate-90")} />
+        </button>
+      ) : (
+        <div className="w-4 shrink-0" />
+      )}
+      <div className="min-w-0 flex-1">{content}</div>
+    </div>
+  );
+};
+
+// The expanded row's own content — fetches the full object (one level of
+// links deep, see buildExpandedRowShape) and renders it with the same
+// JsonTree used by the REPL/Query Editor's own results, plus "View objects"
+// actions on link fields (wired to the same nested-view navigation a link
+// cell click already uses elsewhere in this grid).
+const ExpandedRowContent: React.FC<{
+  objectId: string;
+  pylonType: string;
+  schema: SchemaResponse;
+  onNavigateLink: (row: Row, pointer: SchemaPointer) => void;
+}> = ({objectId, pylonType, schema, onNavigateLink}) => {
+  const schemaType = schema.types.find((t) => qualname(t) === pylonType);
+
+  const dataQuery = useQuery({
+    queryKey: ["dataExplorer", "expandedRow", objectId],
+    queryFn: async () => {
+      const shapeText = buildExpandedRowShape(schemaType!, schema);
+      const res = await api.runQuery(`select ${pylonType} { ${shapeText} } filter .id = <uuid>$objectId`, {objectId});
+      const row = res.objects[0] as Row | undefined;
+      if (!row) return null;
+      // __count_* fields are internal (a multi-link's true total, beyond
+      // the 10-item preview cap) — not meant to render as their own entry.
+      const cleaned = Object.fromEntries(Object.entries(row).filter(([k]) => !k.startsWith("__count_"))) as Row;
+      // res.shape (the compiled query's own value-shape tag) is what lets
+      // JsonTree tell a structural tuple apart from a plain nested object —
+      // same convention ResultPanel.tsx/ReplEntry.tsx already use for their
+      // own query results.
+      return {row: cleaned, valueShape: res.shape};
+    },
+    enabled: !!schemaType,
+  });
+
+  return (
+    <div className="px-4 py-3">
+      {dataQuery.isLoading ? (
+        <div className="text-sm text-fg-muted">Loading data…</div>
+      ) : dataQuery.data ? (
+        <JsonTree
+          value={dataQuery.data.row}
+          valueShape={dataQuery.data.valueShape}
+          rootPylonType={pylonType}
+          hideCopyButton
+          onNavigateLink={(pointer) => onNavigateLink({id: objectId} as Row, pointer)}
+        />
+      ) : (
+        <div className="text-sm text-fg-muted">Not found.</div>
+      )}
+    </div>
   );
 };
 

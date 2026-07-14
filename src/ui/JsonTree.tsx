@@ -1,10 +1,11 @@
 import type React from "react";
 import {useState} from "react";
 import clsx from "clsx";
-import {Check, ChevronRight, Copy} from "lucide-react";
+import {ArrowRight, Check, ChevronRight, Copy} from "lucide-react";
 
-import type {SchemaResponse, ValueShapeTag} from "@/lib/api/client";
+import type {SchemaPointer, SchemaResponse, ValueShapeTag} from "@/lib/api/client";
 import {useSchema} from "@/lib/api/useSchema";
+import {qualname} from "@/lib/schema/inheritance";
 import {lookupPointerTypeTag, valueShapeChild, valueShapeToPointerTypeTag} from "@/lib/schema/typeTags";
 import {ScalarValue} from "@/ui/ScalarValue";
 
@@ -19,6 +20,23 @@ interface JsonTreeProps {
   // all (e.g. history replays of an older entry) — falls back to the
   // pointer-name guess everywhere.
   valueShape?: ValueShapeTag;
+  // Renders a "View objects" action next to any link/multi-link field
+  // (resolved from the parent object's own schema pointers), calling this
+  // with that pointer when clicked. Only ever passed by the Data Explorer's
+  // row-expansion view — REPL/Query Editor's own JsonTree usage omits it,
+  // so no button shows there.
+  onNavigateLink?: (pointer: SchemaPointer) => void;
+  // The root value's own pylon type, when the caller already knows it —
+  // falls back to the value's own embedded __pylon_type__ marker otherwise,
+  // which a query selecting a *concrete* (non-abstract) type directly often
+  // doesn't bother sending (no polymorphism to disambiguate), leaving link
+  // detection on its top-level fields with nothing to resolve against.
+  rootPylonType?: string;
+  // Omits the hover-revealed "Copy JSON" action — the Data Explorer's
+  // row-expansion view already has its own top-level way to inspect/copy
+  // data and doesn't want it competing with "View objects" for the same
+  // row's attention. REPL/Query Editor leave this unset, keeping it.
+  hideCopyButton?: boolean;
 }
 
 // Recursively strips __pylon_type__ before copying, so "Copy JSON" produces
@@ -40,13 +58,20 @@ const stripInternal = (value: unknown): unknown => {
 // `<uuid>`/`<std::datetime>`/`module::Enum.Member` tags resolved from real
 // schema data (see src/lib/schema/typeTags.ts) rather than guessed from the
 // value's shape.
-export const JsonTree: React.FC<JsonTreeProps> = ({value, className, valueShape}) => {
+export const JsonTree: React.FC<JsonTreeProps> = ({value, className, valueShape, onNavigateLink, rootPylonType, hideCopyButton}) => {
   const {data: schema} = useSchema();
 
   // Output
   return (
     <div className={clsx("font-mono text-sm", className)}>
-      <JsonNode value={value} schema={schema} valueShape={valueShape} />
+      <JsonNode
+        value={value}
+        schema={schema}
+        valueShape={valueShape}
+        onNavigateLink={onNavigateLink}
+        ownTypeOverride={rootPylonType}
+        hideCopyButton={hideCopyButton}
+      />
     </div>
   );
 };
@@ -77,10 +102,38 @@ interface JsonNodeProps {
   schema: SchemaResponse | undefined;
   parentPylonType?: string;
   valueShape?: ValueShapeTag;
+  onNavigateLink?: (pointer: SchemaPointer) => void;
+  // Fallback for *this* node's own pylon type when its value has no
+  // embedded __pylon_type__ marker — only ever passed at the root (see
+  // JsonTree's rootPylonType), not threaded to recursive calls below.
+  ownTypeOverride?: string;
+  hideCopyButton?: boolean;
 }
 
-const JsonNode: React.FC<JsonNodeProps> = ({label, value, schema, parentPylonType, valueShape}) => {
+const JsonNode: React.FC<JsonNodeProps> = ({
+  label,
+  value,
+  schema,
+  parentPylonType,
+  valueShape,
+  onNavigateLink,
+  ownTypeOverride,
+  hideCopyButton,
+}) => {
   const [open, setOpen] = useState(true);
+
+  // This node's own field on its parent object, when there's schema info to
+  // resolve one (schema-driven, not shape-driven — a link value is just a
+  // plain nested object/array otherwise indistinguishable from a tuple's own
+  // fields). Computed unconditionally (not just when onNavigateLink is
+  // passed) since bracket style below needs it regardless of context.
+  const ownPointer =
+    parentPylonType && label !== undefined
+      ? schema?.types.find((t) => qualname(t) === parentPylonType)?.pointers.find((p) => p.name === label)
+      : undefined;
+  // Used below to show a "View objects" action next to a link/multi-link
+  // field — only when the caller actually wants that (see onNavigateLink).
+  const linkPointer = ownPointer && (ownPointer.kind === "link" || ownPointer.kind === "multiLink") ? ownPointer : undefined;
 
   // A tuple/named-tuple value is JS-object-shaped (a dict or array) but
   // renders as a single Gel-style literal `(x := 1, y := 2)`, not as an
@@ -93,23 +146,30 @@ const JsonNode: React.FC<JsonNodeProps> = ({label, value, schema, parentPylonTyp
           {label !== undefined && <span className="text-(--syntax-name)">{label}: </span>}
           <ScalarValue value={value} typeTag={valueShapeToPointerTypeTag(valueShape, schema)} schema={schema} />
         </div>
-        <CopyButton value={value} />
+        {!hideCopyButton && <CopyButton value={value} />}
       </div>
     );
   }
 
   if (value !== null && typeof value === "object") {
     const isArray = Array.isArray(value);
-    const pylonType = !isArray ? (value as {__pylon_type__?: string}).__pylon_type__ : undefined;
+    const pylonType = !isArray ? ((value as {__pylon_type__?: string}).__pylon_type__ ?? ownTypeOverride) : undefined;
     const entries = isArray
       ? (value as unknown[]).map((v, i) => [String(i), v] as const)
       : Object.entries(value as Record<string, unknown>).filter(([k]) => k !== "__pylon_type__");
+    // A multi-link is a *set*, not a list — Gel/EdgeQL convention displays
+    // it with {}/{} like any other object collection, not []/[] (reserved
+    // for a real array<T> property), even though the JS value itself is a
+    // plain array either way.
+    const isMultiLinkSet = ownPointer?.kind === "multiLink";
+    const useListBrackets = isArray && !isMultiLinkSet;
+    const itemWord = isMultiLinkSet ? "object" : isArray ? "item" : "key";
 
     // Output
     return (
       <div>
         <div className="group/row flex items-center rounded hover:bg-surface-hover">
-          <button type="button" onClick={() => setOpen((o) => !o)} className="flex flex-1 items-center gap-1 text-left">
+          <button type="button" onClick={() => setOpen((o) => !o)} className="flex shrink-0 items-center gap-1 text-left">
             <ChevronRight
               size={12}
               className={clsx("shrink-0 text-fg-muted transition-transform", open && "rotate-90")}
@@ -117,12 +177,30 @@ const JsonNode: React.FC<JsonNodeProps> = ({label, value, schema, parentPylonTyp
             {label !== undefined && <span className="text-(--syntax-name)">{label}: </span>}
             {pylonType && <span className="text-fg-muted">{pylonType} </span>}
             <span className="text-fg-muted">
-              {isArray ? "[" : "{"}
-              {!open && ` ${entries.length} ${isArray ? "item" : "key"}${entries.length === 1 ? "" : "s"} `}
-              {!open && (isArray ? "]" : "}")}
+              {useListBrackets ? "[" : "{"}
+              {!open && ` ${entries.length} ${itemWord}${entries.length === 1 ? "" : "s"} `}
+              {!open && (useListBrackets ? "]" : "}")}
             </span>
           </button>
-          <CopyButton value={value} />
+          {onNavigateLink && linkPointer && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onNavigateLink!(linkPointer);
+              }}
+              className="ml-1.5 flex shrink-0 items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-2xs font-medium text-accent hover:bg-accent/20 transition-colors duration-300"
+            >
+              View objects
+              <ArrowRight size={10} />
+            </button>
+          )}
+          {!hideCopyButton && (
+            <>
+              <div className="flex-1" />
+              <CopyButton value={value} />
+            </>
+          )}
         </div>
         {open && (
           <div className="pl-4">
@@ -134,9 +212,11 @@ const JsonNode: React.FC<JsonNodeProps> = ({label, value, schema, parentPylonTyp
                 schema={schema}
                 parentPylonType={pylonType ?? parentPylonType}
                 valueShape={valueShapeChild(valueShape, isArray ? "0" : k)}
+                onNavigateLink={onNavigateLink}
+                hideCopyButton={hideCopyButton}
               />
             ))}
-            <span className="text-fg-muted">{isArray ? "]" : "}"}</span>
+            <span className="text-fg-muted">{useListBrackets ? "]" : "}"}</span>
           </div>
         )}
       </div>
@@ -156,7 +236,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({label, value, schema, parentPylonTyp
         {label !== undefined && <span className="text-(--syntax-name)">{label}: </span>}
         <ScalarValue value={value} typeTag={typeTag} schema={schema} />
       </div>
-      <CopyButton value={value} />
+      {!hideCopyButton && <CopyButton value={value} />}
     </div>
   );
 };
