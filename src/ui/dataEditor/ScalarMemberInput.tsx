@@ -127,7 +127,7 @@ export const ScalarMemberInput: React.FC<ScalarMemberInputProps> = ({
     // classic line-height trick instead. Only looks right for one line, but
     // multi-row growth is already moot: the cell's own overflow-hidden caps
     // it at ROW_HEIGHT regardless.
-    dense ? "h-full px-2 text-2sm leading-[40px]" : "h-10 px-2.5 text-sm",
+    dense ? "h-full px-2 text-sm leading-[2.5rem]" : "h-10 px-2.5 text-sm",
     showTag && "pr-14",
     error ? "border-(--syntax-operator)" : "border-border focus:border-accent"
   );
