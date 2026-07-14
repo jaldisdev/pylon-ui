@@ -80,6 +80,18 @@ const headerTypeLabel = (pointer: SchemaPointer): string | null => {
 // mode can never change a row's real height.
 const ROW_HEIGHT = 42;
 
+// Marks the right edge of a sticky column with a fading gradient bar (an
+// `after:` pseudo-element, not box-shadow — a shadow's blur/spread falls off
+// near the corners, so it doesn't cover a tall column edge-to-edge the way a
+// solid gradient does). Needs its own containing block, which `sticky`
+// already provides — no extra `relative` required. Applied to whichever
+// column is the *last* sticky one at a given breakpoint (see each call
+// site's own md:/max-md: variant): the gutter is always sticky, but only the
+// rightmost pinned column needs the seam, and that shifts from id (desktop)
+// to the gutter itself (mobile, where id un-stickies — see DataGrid's other
+// max-md: handling below).
+const STICKY_COL_SHADOW = "after:absolute after:top-0 after:-right-1.25 after:-bottom-px after:w-1 after:bg-linear-(--bg-sticky-col-fadeout) after:content-['']";
+
 const GUTTER_WIDTH = 40;
 const THROUGH_COLUMN_DEFAULT_WIDTH = 112;
 const COLUMN_DEFAULT_WIDTH = 180;
@@ -279,7 +291,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
         <thead className="sticky top-0 z-10 bg-header">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
-              <th className="sticky left-0 z-20 border-b border-border bg-header px-2 py-1.5 text-fg-muted shadow-(--shadow-sticky-col) md:shadow-none">
+              <th className={clsx("sticky left-0 z-20 border-b border-border bg-header px-2 py-1.5 text-fg-muted", STICKY_COL_SHADOW, "md:after:content-none")}>
                 <Menu size={12} strokeWidth={1.75} />
               </th>
               {linkEditMode?.throughPointers?.map((tp) => (
@@ -309,7 +321,11 @@ export const DataGrid: React.FC<DataGridProps> = ({
                       // its own className above) since id is then the one
                       // scrolling normally.
                       pointer.name === "id" &&
-                        "sticky left-10 z-20 bg-header shadow-(--shadow-sticky-col) max-md:static max-md:left-auto max-md:z-auto max-md:shadow-none"
+                        clsx(
+                          "sticky left-10 z-20 bg-header max-md:static max-md:left-auto max-md:z-auto",
+                          STICKY_COL_SHADOW,
+                          "max-md:after:content-none"
+                        )
                     )}
                   >
                     <button
@@ -397,7 +413,9 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 <td
                   style={{height: ROW_HEIGHT}}
                   className={clsx(
-                    "sticky left-0 overflow-hidden border-b border-l-2 bg-surface px-2 py-2.5 text-right font-mono text-xs text-fg-muted shadow-(--shadow-sticky-col) group-hover/row:bg-surface-hover md:shadow-none",
+                    "sticky left-0 border-b border-l-2 bg-surface px-2 py-2.5 text-right font-mono text-xs text-fg-muted group-hover/row:bg-surface-hover",
+                    STICKY_COL_SHADOW,
+                    "md:after:content-none",
                     isInsertRow ? "border-b-border border-l-green-500" : isDeletedRow ? "border-b-border border-l-red-500" : "border-border border-l-transparent"
                   )}
                 >
@@ -453,23 +471,18 @@ export const DataGrid: React.FC<DataGridProps> = ({
                       }}
                       style={{height: ROW_HEIGHT}}
                       className={clsx(
-                        "border-b border-border font-mono text-ellipsis whitespace-nowrap",
+                        "border-b border-border font-mono",
                         // Editing drops the cell's own padding so the editor
                         // inside (ScalarMemberInput et al.) can sit flush
                         // against the cell's edges, matching Gel's own inline
-                        // editor look, instead of being inset within it. Also
-                        // drops overflow-hidden — needed the rest of the time
-                        // for text-ellipsis truncation, but while editing it
-                        // would clip the optional "unset" button, which
-                        // deliberately renders past this cell's own right
-                        // edge (translate-x-full, see DataEditorCell.tsx).
-                        // Safe to drop here: the editor's own height is now
-                        // exact (see ScalarMemberInput's leading-0 fix), so
-                        // there's nothing left for it to still be guarding
-                        // against vertically.
-                        isEditing ? "p-0" : "overflow-hidden px-2 py-2.5",
+                        // editor look, instead of being inset within it.
+                        isEditing ? "p-0" : "px-2 py-2.5",
                         pointer.name === "id" &&
-                          "sticky left-10 bg-surface shadow-(--shadow-sticky-col) group-hover/row:bg-surface-hover max-md:static max-md:left-auto max-md:shadow-none",
+                          clsx(
+                            "sticky left-10 bg-surface group-hover/row:bg-surface-hover max-md:static max-md:left-auto",
+                            STICKY_COL_SHADOW,
+                            "max-md:after:content-none"
+                          ),
                         isLink && "cursor-pointer",
                         // Hints a cell is double-click-editable before the
                         // user commits to it, matching Gel's own hover state
@@ -487,38 +500,48 @@ export const DataGrid: React.FC<DataGridProps> = ({
                           onDiscard={discardActiveEdit}
                           onTabNext={moveToAdjacentEditableCell}
                         />
-                      ) : isLink ? (
-                        isInsertRow ? (
-                          <InsertLinkCell tempId={objectId as number} pointer={pointer} linkEdits={linkEdits} />
-                        ) : (
-                          <LinkCell value={rawFetchedValue} pointer={pointer} />
-                        )
                       ) : (
-                        <span className={clsx("flex items-center gap-1", isInvalid && "text-red-500")}>
-                          {isInvalid ? (
-                            <span>{editValue.raw || "(empty)"}</span>
+                        // overflow-hidden lives here (not on the <td>) so it
+                        // doesn't clip the id column's after: shadow above,
+                        // which deliberately renders past the cell's own
+                        // right edge — same reason DataEditorCell's own
+                        // "unset" button uses translate-x-full instead of
+                        // sitting inside the cell.
+                        <div className="overflow-hidden text-ellipsis whitespace-nowrap">
+                          {isLink ? (
+                            isInsertRow ? (
+                              <InsertLinkCell tempId={objectId as number} pointer={pointer} linkEdits={linkEdits} />
+                            ) : (
+                              <LinkCell value={rawFetchedValue} pointer={pointer} />
+                            )
                           ) : (
-                            <ScalarValue
-                              value={displayValue}
-                              typeTag={lookupPointerTypeTag(schema, pylonType, pointer.name)}
-                              schema={schema}
-                              compact
-                            />
+                            <span className={clsx("flex items-center gap-1", isInvalid && "text-red-500")}>
+                              {isInvalid ? (
+                                <span>{editValue.raw || "(empty)"}</span>
+                              ) : (
+                                <ScalarValue
+                                  value={displayValue}
+                                  typeTag={lookupPointerTypeTag(schema, pylonType, pointer.name)}
+                                  schema={schema}
+                                  compact
+                                />
+                              )}
+                              {hasEdit && !isInsertRow && (
+                                <button
+                                  type="button"
+                                  title="Undo edit"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    clearPropertyEdit(objectId, pointer.name);
+                                  }}
+                                  className="text-orange-500 hover:text-orange-400"
+                                >
+                                  <Undo2 size={11} strokeWidth={1.75} />
+                                </button>
+                              )}
+                            </span>
                           )}
-                          {hasEdit && !isInsertRow && (
-                            <button
-                              type="button"
-                              title="Undo edit"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                clearPropertyEdit(objectId, pointer.name);
-                              }}
-                              className="text-orange-500 hover:text-orange-400"
-                            >
-                              <Undo2 size={11} strokeWidth={1.75} />
-                            </button>
-                          )}
-                        </span>
+                        </div>
                       )}
                     </td>
                   );
