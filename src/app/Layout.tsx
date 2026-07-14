@@ -1,4 +1,5 @@
 import type React from "react";
+import {useEffect} from "react";
 import {Outlet, useParams} from "react-router-dom";
 
 import {useConnections} from "@/lib/api/useConnections";
@@ -26,6 +27,12 @@ export const Layout: React.FC = () => {
   // "main" or a configured [database.<name>] — rendering optimistically
   // (as valid) until then avoids a loading-state flash on every navigation.
   const isUnknownConnection = !!connections && !!branch && !connections.connections.includes(branch);
+
+  // Mirrors the project/connection breadcrumb shown in TopBar, so the
+  // browser tab/window title identifies which connection is open.
+  useEffect(() => {
+    document.title = `${connections?.project ?? "pylon"} / ${branch} · Pylon`;
+  }, [connections?.project, branch]);
 
   // Output — Sidebar spans the full height directly below TopBar; GlobalsBar
   // sits in the content column so it's indented to the same level as `main`,
