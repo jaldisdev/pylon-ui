@@ -111,7 +111,7 @@ export const ScalarMemberInput: React.FC<ScalarMemberInputProps> = ({
   const error = externalError ?? internalError;
   const showTag = castType && !dense;
   const inputClassName = clsx(
-    "w-full border bg-surface font-mono text-fg outline-none disabled:opacity-50",
+    "w-full border-[1.5px] bg-surface font-mono text-fg outline-none disabled:opacity-50",
     // Dense (grid-cell) mode now sits flush against the cell's own edges
     // (see DataGrid.tsx's `isEditing ? "p-0" : ...`) — a rounded corner
     // butted against a square cell boundary looks like a clipped corner, so

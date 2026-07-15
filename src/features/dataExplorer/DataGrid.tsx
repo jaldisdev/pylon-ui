@@ -466,8 +466,10 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 {renderHeaderCellContent(col)}
                 <div
                   onMouseDown={startResize(columnKey(col))}
-                  className="absolute inset-y-0 right-0 w-1 cursor-col-resize select-none hover:bg-accent/50 active:bg-accent"
-                />
+                  className="absolute inset-y-0 right-0 flex items-center justify-center w-1 cursor-col-resize select-none hover:bg-accent/50 active:bg-accent transition-all duration-300"
+                >
+                  <div className="w-px h-[70%] bg-current/25" />
+                </div>
               </div>
             );
           })}
@@ -581,7 +583,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     // commits to it, matching Gel's own hover state — ring
                     // (not border) so it draws inset, inside the existing
                     // border-box, rather than shifting layout.
-                    cellEditable && !isEditing && "cursor-text hover:ring-1 hover:ring-inset hover:ring-accent"
+                    cellEditable && !isEditing && "cursor-text hover:ring-[1.5px] hover:ring-inset hover:ring-accent"
                   )}
                 >
                   {isEditing ? (
