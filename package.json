@@ -27,6 +27,7 @@
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.14.6",
     "clsx": "^2.1.1",
+    "lossless-json": "^4.3.0",
     "lucide-react": "^1.24.0",
     "radix-ui": "^1.6.2",
     "react": "^19.2.7",

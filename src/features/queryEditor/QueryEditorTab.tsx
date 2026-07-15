@@ -130,7 +130,12 @@ export const QueryEditorTab: React.FC = () => {
       {pyql, paramsDict},
       {
         onSuccess: (data) => {
-          const result = {objects: data.objects, durationMs: data.duration_ms, shape: data.shape};
+          const result = {
+            objects: data.objects,
+            durationMs: data.duration_ms,
+            shape: data.shape,
+            floatMarkers: data.floatMarkers,
+          };
           setResult(result);
           setError(null);
           setLastRunQueryText(pyql);

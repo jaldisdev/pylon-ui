@@ -15,12 +15,17 @@ interface ScalarValueProps {
   // (e.g. an enum or nested-tuple member) — omit it and a tuple still
   // renders correctly, just without those members' own tags/hydration.
   schema?: SchemaResponse;
+  // True when this value's *original* JSON text had a decimal point/exponent
+  // (see floatMarkers.ts) — a whole-number float/decimal (e.g. 1.0) is
+  // otherwise indistinguishable from a plain int once JSON.parse collapses
+  // both to the same JS number, so `value` alone can't tell them apart.
+  forceFloat?: boolean;
 }
 
 // Renders one scalar value with schema-derived type tags (`<uuid>`,
 // `module::Enum.Member`) — shared by JsonTree (REPL/Query Editor results) and
 // the Data Explorer grid, so every surface renders values identically.
-export const ScalarValue: React.FC<ScalarValueProps> = ({value, typeTag, compact, schema}) => {
+export const ScalarValue: React.FC<ScalarValueProps> = ({value, typeTag, compact, schema, forceFloat}) => {
   if (value === null || value === undefined) {
     return <span className="text-fg-muted">{"{}"}</span>;
   }
@@ -89,7 +94,12 @@ export const ScalarValue: React.FC<ScalarValueProps> = ({value, typeTag, compact
     );
   }
   if (typeof value === "number") {
-    return <span className="text-(--syntax-number)">{value}</span>;
+    // A whole-number float/decimal (e.g. 1.0) is otherwise indistinguishable
+    // from a plain int once JSON.parse collapses both to the same JS number
+    // — force the trailing ".0" back on when we know (via forceFloat) that
+    // the original literal had one, matching EdgeQL/Gel's own float display.
+    const text = forceFloat && Number.isInteger(value) ? `${value}.0` : String(value);
+    return <span className="text-(--syntax-number)">{text}</span>;
   }
   if (typeof value === "boolean") {
     return <span className="text-(--syntax-number)">{String(value)}</span>;

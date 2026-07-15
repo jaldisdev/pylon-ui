@@ -2,6 +2,7 @@ import type React from "react";
 import {Loader2} from "lucide-react";
 
 import type {ValueShapeTag} from "@/lib/api/client";
+import type {FloatMarkerTree} from "@/lib/api/floatMarkers";
 import {JsonTree} from "@/ui/JsonTree";
 
 export interface QueryResult {
@@ -11,6 +12,8 @@ export interface QueryResult {
   // field was added won't have it; JsonTree falls back to a pointer-name
   // guess when no shape is available.
   shape?: ValueShapeTag;
+  // Same "persisted before this field existed" caveat as shape above.
+  floatMarkers?: FloatMarkerTree;
 }
 
 interface ResultPanelProps {
@@ -52,6 +55,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = ({isRunning, result, erro
         <JsonTree
           value={result.objects}
           valueShape={result.shape !== undefined ? {kind: "array", element: result.shape} : undefined}
+          floatMarkers={result.floatMarkers}
         />
       </div>
       <div className="flex h-7 shrink-0 select-none items-center justify-center bg-surface text-2xs text-fg-muted">

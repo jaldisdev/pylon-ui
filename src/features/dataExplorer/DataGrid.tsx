@@ -7,6 +7,7 @@ import {useQuery} from "@tanstack/react-query";
 import {ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, ChevronRight, Link2, Menu, Trash2, Undo2} from "lucide-react";
 
 import {api, type SchemaPointer, type SchemaResponse, type SchemaType} from "@/lib/api/client";
+import {floatMarkerChild} from "@/lib/api/floatMarkers";
 import {isSelfOrDescendant, qualname} from "@/lib/schema/inheritance";
 import {lookupPointerTypeTag} from "@/lib/schema/typeTags";
 import {formatTupleType} from "@/lib/schema/tupleTypeCast";
@@ -846,8 +847,9 @@ const ExpandedRowContent: React.FC<{
       // res.shape (the compiled query's own value-shape tag) is what lets
       // JsonTree tell a structural tuple apart from a plain nested object —
       // same convention ResultPanel.tsx/ReplEntry.tsx already use for their
-      // own query results.
-      return {row: cleaned, valueShape: res.shape};
+      // own query results. res.floatMarkers aligns with the whole objects
+      // array; this view only ever renders row 0.
+      return {row: cleaned, valueShape: res.shape, floatMarkers: floatMarkerChild(res.floatMarkers, "0")};
     },
     enabled: !!schemaType,
   });
@@ -860,6 +862,7 @@ const ExpandedRowContent: React.FC<{
         <JsonTree
           value={dataQuery.data.row}
           valueShape={dataQuery.data.valueShape}
+          floatMarkers={dataQuery.data.floatMarkers}
           rootPylonType={pylonType}
           hideCopyButton
           onNavigateLink={(pointer) => onNavigateLink({id: objectId} as Row, pointer)}

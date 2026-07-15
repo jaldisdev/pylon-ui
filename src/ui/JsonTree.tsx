@@ -4,6 +4,7 @@ import clsx from "clsx";
 import {ArrowRight, Check, ChevronRight, Copy} from "lucide-react";
 
 import type {SchemaPointer, SchemaResponse, ValueShapeTag} from "@/lib/api/client";
+import {floatMarkerChild, isFloatMarker, type FloatMarkerTree} from "@/lib/api/floatMarkers";
 import {useSchema} from "@/lib/api/useSchema";
 import {qualname} from "@/lib/schema/inheritance";
 import {lookupPointerTypeTag, valueShapeChild, valueShapeToPointerTypeTag} from "@/lib/schema/typeTags";
@@ -20,6 +21,13 @@ interface JsonTreeProps {
   // all (e.g. history replays of an older entry) — falls back to the
   // pointer-name guess everywhere.
   valueShape?: ValueShapeTag;
+  // Aligned with `value` itself (see floatMarkers.ts) — lets a whole-number
+  // float/decimal scalar (e.g. 1.0) still render with its decimal point,
+  // which the already-parsed JS value alone can't tell apart from a plain
+  // int. Omit it for a context with no raw response text available at all
+  // (e.g. history replays of an older entry) — falls back to displaying
+  // such a value like a bare int, same as before this existed.
+  floatMarkers?: FloatMarkerTree;
   // Renders a "View objects" action next to any link/multi-link field
   // (resolved from the parent object's own schema pointers), calling this
   // with that pointer when clicked. Only ever passed by the Data Explorer's
@@ -58,7 +66,15 @@ const stripInternal = (value: unknown): unknown => {
 // `<uuid>`/`<std::datetime>`/`module::Enum.Member` tags resolved from real
 // schema data (see src/lib/schema/typeTags.ts) rather than guessed from the
 // value's shape.
-export const JsonTree: React.FC<JsonTreeProps> = ({value, className, valueShape, onNavigateLink, rootPylonType, hideCopyButton}) => {
+export const JsonTree: React.FC<JsonTreeProps> = ({
+  value,
+  className,
+  valueShape,
+  floatMarkers,
+  onNavigateLink,
+  rootPylonType,
+  hideCopyButton,
+}) => {
   const {data: schema} = useSchema();
 
   // Output
@@ -68,9 +84,11 @@ export const JsonTree: React.FC<JsonTreeProps> = ({value, className, valueShape,
         value={value}
         schema={schema}
         valueShape={valueShape}
+        floatMarkers={floatMarkers}
         onNavigateLink={onNavigateLink}
         ownTypeOverride={rootPylonType}
         hideCopyButton={hideCopyButton}
+        isRoot
       />
     </div>
   );
@@ -102,12 +120,20 @@ interface JsonNodeProps {
   schema: SchemaResponse | undefined;
   parentPylonType?: string;
   valueShape?: ValueShapeTag;
+  floatMarkers?: FloatMarkerTree;
   onNavigateLink?: (pointer: SchemaPointer) => void;
   // Fallback for *this* node's own pylon type when its value has no
   // embedded __pylon_type__ marker — only ever passed at the root (see
   // JsonTree's rootPylonType), not threaded to recursive calls below.
   ownTypeOverride?: string;
   hideCopyButton?: boolean;
+  // True only for JsonTree's own initial call, never threaded to recursive
+  // calls below — an array *at the root* is always the query's own result
+  // set (every call site passes the whole `objects` array here), never a
+  // literal array<T> value, even if the query happens to select one (that
+  // would still be one row *within* the set, one level deeper) — so it
+  // always renders with {}/{}, regardless of ownPointer/valueShape.
+  isRoot?: boolean;
 }
 
 const JsonNode: React.FC<JsonNodeProps> = ({
@@ -116,9 +142,11 @@ const JsonNode: React.FC<JsonNodeProps> = ({
   schema,
   parentPylonType,
   valueShape,
+  floatMarkers,
   onNavigateLink,
   ownTypeOverride,
   hideCopyButton,
+  isRoot,
 }) => {
   const [open, setOpen] = useState(true);
 
@@ -153,17 +181,22 @@ const JsonNode: React.FC<JsonNodeProps> = ({
 
   if (value !== null && typeof value === "object") {
     const isArray = Array.isArray(value);
-    const pylonType = !isArray ? ((value as {__pylon_type__?: string}).__pylon_type__ ?? ownTypeOverride) : undefined;
+    // A free object (no schema type at all — e.g. `select { test := 1 }`)
+    // still gets a label, matching Gel's own "Object {...}" convention for
+    // an untyped shape, rather than showing no label at all.
+    const pylonType = !isArray ? ((value as {__pylon_type__?: string}).__pylon_type__ ?? ownTypeOverride ?? "Object") : undefined;
     const entries = isArray
       ? (value as unknown[]).map((v, i) => [String(i), v] as const)
       : Object.entries(value as Record<string, unknown>).filter(([k]) => k !== "__pylon_type__");
     // A multi-link is a *set*, not a list — Gel/EdgeQL convention displays
     // it with {}/{} like any other object collection, not []/[] (reserved
     // for a real array<T> property), even though the JS value itself is a
-    // plain array either way.
+    // plain array either way. The root array is always a query's own result
+    // set too (see isRoot above), for the same reason.
     const isMultiLinkSet = ownPointer?.kind === "multiLink";
-    const useListBrackets = isArray && !isMultiLinkSet;
-    const itemWord = isMultiLinkSet ? "object" : isArray ? "item" : "key";
+    const isRootSet = isRoot && isArray;
+    const useListBrackets = isArray && !isMultiLinkSet && !isRootSet;
+    const itemWord = isMultiLinkSet || isRootSet ? "object" : isArray ? "item" : "key";
 
     // Output
     return (
@@ -212,6 +245,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({
                 schema={schema}
                 parentPylonType={pylonType ?? parentPylonType}
                 valueShape={valueShapeChild(valueShape, isArray ? "0" : k)}
+                floatMarkers={floatMarkerChild(floatMarkers, k)}
                 onNavigateLink={onNavigateLink}
                 hideCopyButton={hideCopyButton}
               />
@@ -234,7 +268,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({
     <div className="group/row flex items-center rounded pl-4 hover:bg-surface-hover">
       <div className="flex-1">
         {label !== undefined && <span className="text-(--syntax-name)">{label}: </span>}
-        <ScalarValue value={value} typeTag={typeTag} schema={schema} />
+        <ScalarValue value={value} typeTag={typeTag} schema={schema} forceFloat={isFloatMarker(floatMarkers)} />
       </div>
       {!hideCopyButton && <CopyButton value={value} />}
     </div>

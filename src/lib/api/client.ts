@@ -4,6 +4,7 @@
 
 import {useGlobalsStore} from "@/lib/state/globalsStore";
 import {useConfigStore} from "@/lib/state/configStore";
+import {extractFloatMarkers, type FloatMarkerTree} from "@/lib/api/floatMarkers";
 
 export class ApiError extends Error {
   constructor(
@@ -22,6 +23,22 @@ export class ApiError extends Error {
 // block) for the rare case this runs before the router has mounted at all.
 const currentConnection = (): string => window.location.pathname.split("/")[1] || "main";
 
+const throwIfNotOk = async (res: Response): Promise<void> => {
+  if (res.ok) return;
+  const text = await res.text().catch(() => "");
+  // The backend's error responses are {"error": "..."} — extract the
+  // actual message instead of surfacing the raw JSON blob. Falls back to
+  // the raw text for non-JSON error bodies (e.g. a proxy/gateway error).
+  let message = text || res.statusText;
+  try {
+    const parsed = JSON.parse(text) as {error?: unknown};
+    if (typeof parsed.error === "string") message = parsed.error;
+  } catch {
+    // not JSON — keep the raw text
+  }
+  throw new ApiError(res.status, message);
+};
+
 const doFetch = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const res = await fetch(`/api${path}`, {
     ...init,
@@ -30,23 +47,28 @@ const doFetch = async <T>(path: string, init?: RequestInit): Promise<T> => {
       ...init?.headers,
     },
   });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    // The backend's error responses are {"error": "..."} — extract the
-    // actual message instead of surfacing the raw JSON blob. Falls back to
-    // the raw text for non-JSON error bodies (e.g. a proxy/gateway error).
-    let message = text || res.statusText;
-    try {
-      const parsed = JSON.parse(text) as {error?: unknown};
-      if (typeof parsed.error === "string") message = parsed.error;
-    } catch {
-      // not JSON — keep the raw text
-    }
-    throw new ApiError(res.status, message);
-  }
-
+  await throwIfNotOk(res);
   return res.json() as Promise<T>;
+};
+
+// Same request/error handling as doFetch, but also re-parses the raw
+// response text with a lossless number parser to recover each value's
+// original "was this written with a decimal point" spelling — see
+// floatMarkers.ts for why this can't be done from the already-parsed JSON
+// alone. Only /query needs this (it's the only route whose response values
+// get rendered as arbitrary, possibly-float scalars in JsonTree); every
+// other route just uses plain doFetch.
+const fetchQueryResponse = async (path: string, init: RequestInit): Promise<QueryResponse> => {
+  const res = await fetch(`/api${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...init.headers,
+    },
+  });
+  await throwIfNotOk(res);
+  const text = await res.text();
+  return {...(JSON.parse(text) as QueryResponse), floatMarkers: extractFloatMarkers(text, ["objects"])};
 };
 
 // Process-level routes (schema/globals/connections/models) are derived from
@@ -81,6 +103,11 @@ export interface QueryResponse {
   objects: unknown[];
   duration_ms: number;
   shape: ValueShapeTag;
+  // A FloatMarkerTree aligned with `objects` itself (not `shape`, which is
+  // the shape of one element) — see floatMarkers.ts. Always present on a
+  // live response; only optional so a persisted REPL history entry from
+  // before this field existed still type-checks.
+  floatMarkers?: FloatMarkerTree;
 }
 
 export interface ConnectionsResponse {
@@ -171,7 +198,7 @@ export const api = {
   getConfigOptions: () => request<ConfigOptionsResponse>("/config-options"),
   getStats: () => connectionRequest<StatsResponse>("/stats"),
   runQuery: (pyql: string, params?: Record<string, unknown>, signal?: AbortSignal) =>
-    connectionRequest<QueryResponse>("/query", {
+    fetchQueryResponse(`/${currentConnection()}/query`, {
       method: "POST",
       // Session globals (configured via the top bar's globals modal) apply
       // to every query automatically — callers never need to pass them. Only

@@ -5,6 +5,7 @@ import {useMutation} from "@tanstack/react-query";
 import {useHotkeys} from "react-hotkeys-hook";
 
 import {api, ApiError, type ValueShapeTag} from "@/lib/api/client";
+import type {FloatMarkerTree} from "@/lib/api/floatMarkers";
 import {useSchema} from "@/lib/api/useSchema";
 import {CodeEditor, type CodeEditorHandle} from "@/lib/editor/CodeEditor";
 import {useLocalStorageState} from "@/lib/hooks/useLocalStorageState";
@@ -24,6 +25,8 @@ export interface HistoryEntry {
   // Entries persisted before this field was added won't have it; ReplEntry
   // falls back to a pointer-name guess when no shape is available.
   shape?: ValueShapeTag;
+  // Same "persisted before this field existed" caveat as shape above.
+  floatMarkers?: FloatMarkerTree;
   error?: string;
   isHelp?: boolean; // \help output — rendered as static text, not a query result
 }
@@ -96,6 +99,7 @@ export const ReplTab: React.FC = () => {
             objects: data.objects,
             durationMs: data.duration_ms,
             shape: data.shape,
+            floatMarkers: data.floatMarkers,
           },
         ]);
       },

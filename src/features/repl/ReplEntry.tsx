@@ -86,6 +86,7 @@ export const ReplEntry: React.FC<ReplEntryProps> = ({entry, branch, showDateHead
                 <JsonTree
                   value={visible}
                   valueShape={entry.shape !== undefined ? {kind: "array", element: entry.shape} : undefined}
+                  floatMarkers={entry.floatMarkers}
                 />
               </div>
               {truncated && (
