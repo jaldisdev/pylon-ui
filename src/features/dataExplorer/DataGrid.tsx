@@ -467,7 +467,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 {renderHeaderCellContent(col)}
                 <div
                   onMouseDown={startResize(columnKey(col))}
-                  className="absolute inset-y-0 right-0 flex items-center justify-center w-1 cursor-col-resize select-none hover:bg-accent/50 active:bg-accent transition-all duration-300"
+                  className="absolute inset-y-0 right-0 flex items-center justify-center w-1 cursor-col-resize select-none"
                 >
                   <div className="w-px h-[70%] bg-current/25" />
                 </div>

@@ -285,6 +285,12 @@ export interface SchemaType {
   // Explorer's Insert button offers a subtype picker when there's more than
   // one concrete option instead.
   abstract: boolean;
+  // @pylon.junction — a through-typed multi-link's own link-property storage
+  // (e.g. ProductTag), entirely compiler-managed and never inserted/queried
+  // directly by a user. Still present here (link-property editing looks up
+  // a through-type's own pointers by name), but the Data Explorer's type
+  // picker filters these out.
+  junction: boolean;
   bases: string[]; // direct Pylon base types' "module::Name", if any
   pointers: SchemaPointer[];
   vectorIndexes: VectorIndexInfo[];

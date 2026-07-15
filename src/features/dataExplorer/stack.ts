@@ -19,7 +19,13 @@ export const parseStack = (schema: SchemaResponse, splat: string): StackEntry[] 
   if (parts.length === 0) return null;
 
   const [rootType, ...rest] = parts;
-  if (!findType(schema, rootType)) return null;
+  const rootTypeDesc = findType(schema, rootType);
+  // A junction type (@pylon.junction) backs a through-typed multi-link's own
+  // link-property storage — entirely compiler-managed, never browsed
+  // directly (see SchemaType.junction) — treated as unresolvable here, same
+  // as a genuinely unknown type, so a direct URL to one 404s instead of
+  // silently rendering it.
+  if (!rootTypeDesc || rootTypeDesc.junction) return null;
 
   const stack: StackEntry[] = [{pylonType: rootType}];
   for (let i = 0; i + 1 < rest.length; i += 2) {

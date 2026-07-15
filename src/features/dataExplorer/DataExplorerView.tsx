@@ -45,6 +45,11 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
   const current = stack[stack.length - 1];
   const schemaType = schema?.types.find((t) => `${t.module}::${t.name}` === current.pylonType);
   const pointers = schemaType?.pointers ?? [];
+  // A junction type (@pylon.junction) backs a through-typed multi-link's own
+  // link-property storage — entirely compiler-managed, never browsed
+  // directly — so the root type picker excludes them (link-property editing
+  // elsewhere still looks them up directly off schema.types by name).
+  const browsableTypes = useMemo(() => schema?.types.filter((t) => !t.junction) ?? [], [schema]);
 
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("ASC");
@@ -318,7 +323,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
             </>
           ) : schema ? (
             <ObjectTypeSelect
-              types={schema.types}
+              types={browsableTypes}
               selected={schemaType ?? null}
               onSelect={(type) => navigate(`${basePath}/${type.module}::${type.name}`)}
               open={typeSelectOpen}

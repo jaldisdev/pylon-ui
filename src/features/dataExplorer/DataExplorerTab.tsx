@@ -6,6 +6,7 @@ import {useHotkeys} from "react-hotkeys-hook";
 import {useSchema} from "@/lib/api/useSchema";
 import {Card} from "@/ui/Card";
 import {ComingSoon} from "@/ui/ComingSoon";
+import {NotFound} from "@/ui/NotFound";
 import {DataExplorerView} from "@/features/dataExplorer/DataExplorerView";
 import {ReviewEditsModal} from "@/features/dataExplorer/ReviewEditsModal";
 import {parseStack, stackToPath} from "@/features/dataExplorer/stack";
@@ -44,10 +45,20 @@ export const DataExplorerTab: React.FC = () => {
   const stack = splat ? parseStack(schema, splat) : null;
 
   if (!stack) {
-    // No (or an invalid/stale) type in the URL — redirect to the first
-    // available type, mirroring gel-ui's own auto-redirect behavior rather
-    // than silently rendering content the URL doesn't reflect.
-    const first = schema.types[0];
+    if (splat) {
+      // An explicit path segment was given but didn't resolve (unknown
+      // type, or a junction type — see SchemaType.junction — deliberately
+      // excluded from browsing) — 404 rather than silently redirecting
+      // somewhere the URL doesn't reflect.
+      return (
+        <Card>
+          <NotFound label={`No object type named "${splat.split("/")[0]}"`} />
+        </Card>
+      );
+    }
+    // No type in the URL at all — redirect to the first available
+    // (non-junction) type, mirroring gel-ui's own auto-redirect behavior.
+    const first = schema.types.find((t) => !t.junction);
     return first ? (
       <Navigate to={`${basePath}/${first.module}::${first.name}`} replace />
     ) : (
