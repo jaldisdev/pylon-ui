@@ -256,7 +256,11 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
 
   // Same condition InsertRowButton is rendered under below — reused by the
   // Mod+I hotkey to decide whether inserting even makes sense right now.
-  const canInsert = (!current.parent || linkEditModeOn || isInsertParent) && !!schema && !!schemaType;
+  // Only offered at the root view (directly managing a type) — a nested
+  // view (whether just viewing linked targets or actively picking/editing
+  // them in "Edit links" mode) is browsing *in relation to* a parent
+  // object, not managing the target type itself.
+  const canInsert = !current.parent && !!schema && !!schemaType;
 
   const handleInsert = (concreteTypeName: string) => {
     createNewRow(
