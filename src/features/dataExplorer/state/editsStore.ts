@@ -100,7 +100,13 @@ interface DataEditsState {
     pointerName: string,
     linkTypeName: string,
     target: {id: string; typename: string},
-    single: boolean
+    single: boolean,
+    // True when `target` was already this single-link's server-side value
+    // before any edits this session — re-selecting it nets to zero change,
+    // so it discards the whole pending edit instead of recording a
+    // spurious "add". Irrelevant (never triggers a discard) for a
+    // multi-link — see addLinkUpdate's own comment.
+    wasOriginallyLinked?: boolean
   ) => void;
   removeLinkUpdate: (
     objectId: string | number,
@@ -284,10 +290,20 @@ export const useDataEditsStore = create<DataEditsState>()((set, get) => ({
     });
   },
 
-  addLinkUpdate: (objectId, objectTypeName, pointerName, linkTypeName, target, single) => {
+  addLinkUpdate: (objectId, objectTypeName, pointerName, linkTypeName, target, single, wasOriginallyLinked) => {
     set((s) => {
       const linkEdits = new Map(s.linkEdits);
       const key = editKey(objectId, pointerName);
+      // Single-link only: re-selecting the target that was already linked
+      // on the server before any edits this session is a true no-op (the
+      // pointer's pending edit — whatever it was, a different target's
+      // "add" or a setNull — is entirely superseded by picking the
+      // original value back) — discard it outright rather than recording
+      // an "add" that would otherwise generate a no-op commit statement.
+      if (single && wasOriginallyLinked) {
+        linkEdits.delete(key);
+        return {linkEdits};
+      }
       const existing = linkEdits.get(key) ?? emptyLinkEdit(objectId, objectTypeName, pointerName, linkTypeName);
       // A single-link can only reference one target — selecting a new one
       // always clears any other pending change/insert for this pointer first.

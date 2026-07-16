@@ -526,7 +526,23 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 linkProperties = parentEdit?.insertProperties.get(objectId as number);
               } else {
                 const change = parentEdit?.changes.get(objectId as string);
-                linkChecked = change ? change.kind === "add" : linkEditMode.linkedIds.has(objectId as string);
+                // A single-link's `changes` map holds *at most one* entry
+                // (addLinkUpdate replaces it wholesale, never appends — see
+                // editsStore.ts) — so once any edit exists for this pointer
+                // at all, `changes` is the full, authoritative new state:
+                // whichever row it names is linked, every other row isn't,
+                // regardless of what was linked on the server before. Only
+                // fall back to the server's own linkedIds when the pointer
+                // hasn't been touched this session yet. A multi-link's
+                // `changes` are incremental adds/removes on top of the
+                // server state, so untouched rows there must still consult
+                // linkedIds even after other rows have been edited.
+                const singleLinkReplaced = linkEditMode.single && !!parentEdit;
+                linkChecked = change
+                  ? change.kind === "add"
+                  : singleLinkReplaced
+                    ? false
+                    : linkEditMode.linkedIds.has(objectId as string);
                 linkProperties = change?.properties;
                 // No pending edit of its own yet — an already-linked row
                 // still has its *existing* server-side property values to
@@ -562,7 +578,15 @@ export const DataGrid: React.FC<DataGridProps> = ({
               } else if (linkChecked) {
                 removeLinkUpdate(parentId, parentObjectTypeName, pointerName, linkTypeName, objectId as string);
               } else {
-                addLinkUpdate(parentId, parentObjectTypeName, pointerName, linkTypeName, {id: objectId as string, typename: pylonType}, single);
+                addLinkUpdate(
+                  parentId,
+                  parentObjectTypeName,
+                  pointerName,
+                  linkTypeName,
+                  {id: objectId as string, typename: pylonType},
+                  single,
+                  linkEditMode.linkedIds.has(objectId as string)
+                );
               }
             };
 
@@ -796,30 +820,34 @@ const GutterCell: React.FC<GutterCellProps> = ({
 }) => {
   let content: React.ReactNode;
   if (linkEditMode) {
-    // A single-link's *checked* row can't be a plain radio: browsers never
-    // fire onChange for a click on an already-checked radio (no state
-    // transition to report), so there'd be no way to clear it back to
-    // unset. Once checked, it switches to a real button instead — clicking
-    // it always fires, unlinking it — matching Gel's own solid "linked"
-    // badge for this exact reason.
-    content =
-      linkSingle && linkChecked ? (
-        <button
-          type="button"
-          onClick={onToggleLink}
-          title="Unlink"
-          className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-fg hover:opacity-90"
-        >
-          <Link2 size={12} strokeWidth={2} />
-        </button>
-      ) : (
-        <input
-          type={linkSingle ? "radio" : "checkbox"}
-          checked={linkChecked}
-          onChange={onToggleLink}
-          className="cursor-pointer accent-(--color-accent)"
-        />
-      );
+    // A custom button in every state (never a native input) — matching
+    // Gel's own always-custom toggle (see dataInspector.module.scss's
+    // .selectLinkAction), and sidestepping a real bug a native
+    // radio/checkbox has here: clicking a *different* row's native radio
+    // fires that row's own onChange, but the previously-checked row's own
+    // input never gets one (browsers only fire onChange for the input whose
+    // own checked state actually changed via user interaction — the
+    // previously-checked one's checked prop flips from true to false purely
+    // by React re-rendering it, which isn't a "change event" at all), so its
+    // visual state relied entirely on the checked prop taking effect — a
+    // plain button re-rendered off the same linkChecked prop has no such
+    // gap. Single-link (radio) renders fully rounded; multi-link (checkbox)
+    // renders a square with slightly rounded corners — same shape
+    // convention Gel uses.
+    content = (
+      <button
+        type="button"
+        onClick={onToggleLink}
+        title={linkChecked ? "Unlink" : "Link"}
+        className={clsx(
+          "flex h-4 w-4 shrink-0 items-center justify-center border-2",
+          linkSingle ? "rounded-full" : "rounded-[3px]",
+          linkChecked ? "border-transparent bg-accent text-accent-fg" : "border-border bg-surface hover:border-accent"
+        )}
+      >
+        {linkChecked && <Link2 size={10} strokeWidth={2.5} />}
+      </button>
+    );
   } else if (isInsertRow) {
     content = (
       <button type="button" onClick={onToggleDelete} title="Remove" className="flex h-full w-full items-center justify-end text-fg-muted hover:text-red-500">
