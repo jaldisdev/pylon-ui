@@ -29,8 +29,17 @@ interface DataExplorerViewProps {
 // Builds the shape fragment for a SELECT — links/multi-links are
 // requested as `{id}` only (the grid just needs a count + the id to
 // navigate), verified against the real backend rather than assumed.
-const buildShape = (pointers: {name: string; kind: string}[]) =>
-  pointers.map((p) => (p.kind === "link" || p.kind === "multiLink" ? `${p.name}: {id}` : p.name)).join(", ");
+// `linkPropNames` (only meaningful when this shape is itself nested inside a
+// specific multi-link traversal — see the "nested view of a real parent"
+// query branch below) appends `@name` read references for the junction
+// type's own properties, e.g. `@weight` — confirmed working directly against
+// pylon-core: a bare `@name` in a nested shape reads the link property off
+// that specific edge, no different from `@name := expr` on the write side.
+const buildShape = (pointers: {name: string; kind: string}[], linkPropNames: string[] = []) =>
+  [
+    ...pointers.map((p) => (p.kind === "link" || p.kind === "multiLink" ? `${p.name}: {id}` : p.name)),
+    ...linkPropNames.map((name) => `@${name}`),
+  ].join(", ");
 
 // One nested-view level: header (type picker or back-button breadcrumb),
 // row count/refresh, filter toggle, and the grid itself. Re-mounted (see the
@@ -115,9 +124,13 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
       // Nested view of a real, persisted parent (not editing links): fetch
       // the parent by id with the link field's shape embedded — simpler and
       // verified-working, vs. trying to make the *target* type the
-      // top-level SELECT subject via a reverse filter.
+      // top-level SELECT subject via a reverse filter. Link properties (see
+      // throughPointers) are only meaningful here — this is the one query
+      // shape that's actually scoped to a specific parent-child edge.
+      const linkPropNames = throughPointers?.map((p) => p.name) ?? [];
+      const nestedShape = linkPropNames.length > 0 ? buildShape(pointers, linkPropNames) : shape;
       return {
-        pyql: `select ${current.parent.parentType} { ${current.parent.fieldName}: { ${shape} }${filterClause}${orderClause} limit 500 } filter .id = <uuid>$parentId`,
+        pyql: `select ${current.parent.parentType} { ${current.parent.fieldName}: { ${nestedShape} }${filterClause}${orderClause} limit 500 } filter .id = <uuid>$parentId`,
         params: {parentId: current.parent.id},
         extractField: current.parent.fieldName,
       };
@@ -131,7 +144,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
       params: undefined,
       extractField: null as string | null,
     };
-  }, [pointers, sortField, sortDir, filterExpr, current, linkEditModeOn, isInsertParent]);
+  }, [pointers, sortField, sortDir, filterExpr, current, linkEditModeOn, isInsertParent, throughPointers]);
 
   const dataQuery = useQuery({
     queryKey: ["dataExplorer", "objects", branch, current, sortField, sortDir, filterExpr, linkEditModeOn],
@@ -160,10 +173,12 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
     enabled: !current.parent || linkEditModeOn || isInsertParent,
   });
 
-  // Which target ids are already linked on the server — only needed in
-  // "Edit links" mode for a real (persisted) parent, to seed each row's
-  // checkbox/radio starting state. A pending insert row never has anything
-  // linked on the server yet, so this is skipped entirely for it.
+  // Which target ids are already linked on the server, plus their current
+  // link-property values (e.g. ProductTag.weight) — only needed in "Edit
+  // links" mode for a real (persisted) parent, to seed each row's
+  // checkbox/radio and property-input starting state. A pending insert row
+  // never has anything linked on the server yet, so this is skipped
+  // entirely for it.
   const linkedIdsQuery = useQuery({
     queryKey: [
       "dataExplorer",
@@ -175,12 +190,21 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
     ],
     queryFn: async () => {
       const parent = current.parent!;
-      const res = await api.runQuery(`select ${parent.parentType} { ${parent.fieldName}: {id} } filter .id = <uuid>$parentId`, {
-        parentId: parent.id,
-      });
+      const linkPropNames = throughPointers?.map((p) => p.name) ?? [];
+      const propsShape = linkPropNames.length > 0 ? `, ${linkPropNames.map((n) => `@${n}`).join(", ")}` : "";
+      const res = await api.runQuery(
+        `select ${parent.parentType} { ${parent.fieldName}: {id${propsShape}} } filter .id = <uuid>$parentId`,
+        {parentId: parent.id}
+      );
       const extracted = (res.objects[0] as Row | undefined)?.[parent.fieldName];
       const items = (Array.isArray(extracted) ? extracted : extracted ? [extracted] : []) as Row[];
-      return new Set(items.map((item) => item.id as string));
+      const properties = new Map<string, Record<string, unknown>>();
+      for (const item of items) {
+        const values: Record<string, unknown> = {};
+        for (const name of linkPropNames) values[name] = item[`@${name}`];
+        properties.set(item.id as string, values);
+      }
+      return {ids: new Set(items.map((item) => item.id as string)), properties};
     },
     enabled: !!current.parent && linkEditModeOn && !isInsertParent,
   });
@@ -193,7 +217,8 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
           pointerName: current.parent.fieldName,
           linkTypeName: current.pylonType,
           single: isSingleLink,
-          linkedIds: isInsertParent ? new Set() : (linkedIdsQuery.data ?? new Set()),
+          linkedIds: isInsertParent ? new Set() : (linkedIdsQuery.data?.ids ?? new Set()),
+          linkedProperties: isInsertParent ? new Map() : (linkedIdsQuery.data?.properties ?? new Map()),
           throughPointers: throughPointers && throughPointers.length > 0 ? throughPointers : undefined,
         }
       : undefined;
@@ -419,6 +444,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
           onNavigateLink={navigateLink}
           onNavigateInsertLink={navigateInsertLink}
           linkEditMode={linkEditMode}
+          viewThroughPointers={throughPointers}
         />
       ) : (
         <div className="flex flex-1 items-center justify-center text-sm text-fg-muted">

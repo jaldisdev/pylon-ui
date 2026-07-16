@@ -9,7 +9,7 @@ import {ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, ChevronRight, Link2, Menu, 
 import {api, type SchemaPointer, type SchemaResponse, type SchemaType} from "@/lib/api/client";
 import {floatMarkerChild} from "@/lib/api/floatMarkers";
 import {isSelfOrDescendant, qualname} from "@/lib/schema/inheritance";
-import {lookupPointerTypeTag} from "@/lib/schema/typeTags";
+import {lookupPointerTypeTag, pointerTypeTag} from "@/lib/schema/typeTags";
 import {formatTupleType} from "@/lib/schema/tupleTypeCast";
 import {useIsMobile} from "@/lib/hooks/useIsMobile";
 import {JsonTree} from "@/ui/JsonTree";
@@ -38,6 +38,12 @@ export interface LinkEditMode {
   linkTypeName: string;
   single: boolean;
   linkedIds: Set<string>;
+  // Each already-linked target's current link-property values (e.g.
+  // ProductTag.weight), keyed by target id — seeds the property input's
+  // starting value for a row that's checked but has no pending edit of its
+  // own yet (see the linkProperties fallback below), so it doesn't render
+  // blank just because the user hasn't touched it this session.
+  linkedProperties?: Map<string, Record<string, unknown>>;
   // The junction (through-type)'s own properties (e.g. ProductTag.weight),
   // excluding "id" — undefined/empty when the multi-link has no through
   // type, or the through type declares no properties beyond id.
@@ -58,11 +64,18 @@ interface DataGridProps {
   // rather than reusing onNavigateLink's row-based signature.
   onNavigateInsertLink: (tempId: number, pointer: SchemaPointer) => void;
   linkEditMode?: LinkEditMode;
+  // The junction (through-type)'s own properties (e.g. ProductTag.weight),
+  // shown as extra read-only columns even outside "Edit links" mode — only
+  // meaningful for a nested view of a real persisted parent (the one query
+  // shape that actually fetches `@name` values; see DataExplorerView.tsx).
+  // Ignored while linkEditMode is set, which carries its own copy (the same
+  // pointers, but rendered as editable inputs instead — see LinkEditMode.throughPointers).
+  viewThroughPointers?: SchemaPointer[];
 }
 
-// Gutter, through-type junction properties (link-edit mode only), and the
-// row's own pointers — same three sections the old <colgroup> composed, in
-// the same order.
+// Gutter, the row's own pointers, and through-type junction properties —
+// junction columns render last (not grouped with the pinned gutter/id block,
+// which assumes its second column is always the "id" pointer).
 type GridColumn = {kind: "gutter"} | {kind: "through"; pointer: SchemaPointer} | {kind: "pointer"; pointer: SchemaPointer};
 
 const columnKey = (col: GridColumn): string =>
@@ -167,6 +180,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   onNavigateLink,
   onNavigateInsertLink,
   linkEditMode,
+  viewThroughPointers,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
@@ -286,12 +300,13 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const gridIndexForDisplayRow = (displayRow: DisplayRow) =>
     gridRowEntries.findIndex((e) => e.kind === "data" && e.displayRow === displayRow);
 
+  const throughPointers = linkEditMode?.throughPointers ?? viewThroughPointers ?? [];
   const allColumns = useMemo<GridColumn[]>(() => {
     const cols: GridColumn[] = [{kind: "gutter"}];
-    for (const tp of linkEditMode?.throughPointers ?? []) cols.push({kind: "through", pointer: tp});
     for (const p of pointers) cols.push({kind: "pointer", pointer: p});
+    for (const tp of throughPointers) cols.push({kind: "through", pointer: tp});
     return cols;
-  }, [pointers, linkEditMode]);
+  }, [pointers, throughPointers]);
 
   const defaultColumnWidth = (col: GridColumn): number => {
     if (col.kind === "gutter") return GUTTER_WIDTH;
@@ -513,6 +528,18 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 const change = parentEdit?.changes.get(objectId as string);
                 linkChecked = change ? change.kind === "add" : linkEditMode.linkedIds.has(objectId as string);
                 linkProperties = change?.properties;
+                // No pending edit of its own yet — an already-linked row
+                // still has its *existing* server-side property values to
+                // show, so the input isn't blank just because the user
+                // hasn't touched it this session.
+                if (!linkProperties && linkChecked) {
+                  const existing = linkEditMode.linkedProperties?.get(objectId as string);
+                  if (existing) {
+                    linkProperties = Object.fromEntries(
+                      Object.entries(existing).map(([k, v]) => [k, {valid: true, value: v} as EditValue])
+                    );
+                  }
+                }
               }
             }
 
@@ -694,8 +721,25 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     height: ROW_HEIGHT,
                   };
                   if (col.kind === "through") {
+                    if (!linkEditMode) {
+                      // Read-only view mode: the value came back inline on
+                      // the fetched row itself (`@name`, from the `@name`
+                      // shape element DataExplorerView.tsx adds — see
+                      // viewThroughPointers), not from any pending edit.
+                      const rawValue = displayRow.kind === "fetched" ? displayRow.row[`@${col.pointer.name}`] : undefined;
+                      return (
+                        <div key={`@${col.pointer.name}`} role="gridcell" style={positionStyle} className="h-full px-2 py-2.5 font-mono">
+                          <ScalarValue value={rawValue} typeTag={pointerTypeTag(col.pointer, schema!)} schema={schema} compact />
+                        </div>
+                      );
+                    }
                     return (
-                      <div key={`@${col.pointer.name}`} role="gridcell" style={positionStyle} className="px-2 py-1.5">
+                      <div
+                        key={`@${col.pointer.name}`}
+                        role="gridcell"
+                        style={positionStyle}
+                        className={clsx("h-full", linkChecked ? "p-0" : "px-2 py-2.5")}
+                      >
                         <LinkPropertyCell
                           pointer={col.pointer}
                           schema={schema!}
