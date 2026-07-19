@@ -1,5 +1,5 @@
 import type React from "react";
-import {useEffect, useMemo, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import {useNavigate, useParams} from "react-router-dom";
 import {useQuery} from "@tanstack/react-query";
 import {useHotkeys} from "react-hotkeys-hook";
@@ -68,6 +68,15 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
   // every object of the target type (not just currently-linked ones) with a
   // checkbox/radio per row, matching gel-ui's link-picker-is-the-grid design.
   const [linkEditModeOn, setLinkEditModeOn] = useState(false);
+  // Ends "Edit links" mode once a commit (or "Discard all") clears every
+  // pending edit — a true->false transition specifically, not just "no
+  // pending edits" on its own, since that's also the state right after
+  // *entering* the mode before anything's been checked yet.
+  const hadPendingEditsRef = useRef(hasPendingEdits);
+  useEffect(() => {
+    if (hadPendingEditsRef.current && !hasPendingEdits) setLinkEditModeOn(false);
+    hadPendingEditsRef.current = hasPendingEdits;
+  }, [hasPendingEdits]);
   const [typeSelectOpen, setTypeSelectOpen] = useState(false);
   const createNewRow = useDataEditsStore((s) => s.createNewRow);
   const insertEdits = useDataEditsStore((s) => s.insertEdits);
