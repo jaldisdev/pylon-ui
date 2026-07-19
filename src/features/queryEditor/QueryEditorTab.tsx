@@ -6,7 +6,7 @@ import clsx from "clsx";
 import {Group, Panel, Separator} from "react-resizable-panels";
 import {Columns2, History, Play, Rows2, Square} from "lucide-react";
 
-import {api, ApiError} from "@/lib/api/client";
+import {api, ApiError, type QueryErrorInfo} from "@/lib/api/client";
 import {useSchema} from "@/lib/api/useSchema";
 import {CodeEditor, type CodeEditorHandle} from "@/lib/editor/CodeEditor";
 import {coerceParamValue, extractParams, validateCastValue} from "@/lib/editor/lang-pyql/extractParams";
@@ -55,7 +55,7 @@ export const QueryEditorTab: React.FC = () => {
   const [history, setHistory] = useLocalStorageState<HistoryEntry[]>(HISTORY_STORAGE_KEY, []);
 
   const [result, setResult] = useState<QueryResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<QueryErrorInfo | null>(null);
   const [lastRunQueryText, setLastRunQueryText] = useState<string | null>(null);
 
   const params = useMemo(() => extractParams(queryText), [queryText]);
@@ -156,9 +156,9 @@ export const QueryEditorTab: React.FC = () => {
         },
         onError: (err) => {
           if (err instanceof DOMException && err.name === "AbortError") return; // cancelled, not a real error
-          const message = err instanceof ApiError ? err.message : String(err);
+          const errorInfo: QueryErrorInfo = err instanceof ApiError ? err.toQueryErrorInfo() : {message: String(err)};
           setResult(null);
-          setError(message);
+          setError(errorInfo);
           setLastRunQueryText(pyql);
           setHistory((h) =>
             [
@@ -170,7 +170,7 @@ export const QueryEditorTab: React.FC = () => {
                 objectCount: null,
                 paramValues: {...paramValues},
                 result: null,
-                error: message,
+                error: errorInfo,
               },
             ].slice(-MAX_HISTORY_ENTRIES)
           );

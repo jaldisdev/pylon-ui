@@ -5,6 +5,7 @@ import clsx from "clsx";
 import {HELP_TEXT} from "@/features/repl/banner";
 import type {HistoryEntry} from "@/features/repl/ReplTab";
 import {JsonTree} from "@/ui/JsonTree";
+import {QueryErrorView} from "@/ui/QueryErrorView";
 
 interface ReplEntryProps {
   entry: HistoryEntry;
@@ -69,7 +70,7 @@ export const ReplEntry: React.FC<ReplEntryProps> = ({entry, branch, showDateHead
           {entry.isHelp ? (
             <pre className="font-mono text-sm whitespace-pre-wrap text-fg-muted">{HELP_TEXT}</pre>
           ) : entry.error ? (
-            <pre className="font-mono text-sm whitespace-pre-wrap text-red-500">{entry.error}</pre>
+            <QueryErrorView error={entry.error} />
           ) : (
             <>
               {/* A ::after overlay, absolutely positioned over the bottom of

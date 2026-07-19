@@ -6,13 +6,45 @@ import {useGlobalsStore} from "@/lib/state/globalsStore";
 import {useConfigStore} from "@/lib/state/configStore";
 import {extractFloatMarkers, type FloatMarkerTree} from "@/lib/api/floatMarkers";
 
+export interface QueryErrorPosition {
+  start: number;
+  end: number;
+  line: number;
+  col: number;
+}
+
+// Plain, JSON-persistable projection of an ApiError's structured fields —
+// used wherever an error needs to survive round-tripping through
+// localStorage (query/REPL history), where an actual Error instance
+// wouldn't reliably serialize back.
+export interface QueryErrorInfo {
+  message: string;
+  errorType?: string;
+  hint?: string;
+  details?: string;
+  position?: QueryErrorPosition;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
-    message: string
+    message: string,
+    // Populated for a PylonError raised during /api/query (or /api/ai/chat)
+    // — see pylon/server/asgi.py's _pylon_error_payload. errorType is the
+    // real Python exception class name (e.g. "InvalidQueryError"); position
+    // (when present — a bare Python-side error has none) is the compiler's
+    // own source-span into the query text.
+    public errorType?: string,
+    public hint?: string,
+    public details?: string,
+    public position?: QueryErrorPosition
   ) {
     super(message);
     this.name = "ApiError";
+  }
+
+  toQueryErrorInfo(): QueryErrorInfo {
+    return {message: this.message, errorType: this.errorType, hint: this.hint, details: this.details, position: this.position};
   }
 }
 
@@ -26,17 +58,33 @@ const currentConnection = (): string => window.location.pathname.split("/")[1] |
 const throwIfNotOk = async (res: Response): Promise<void> => {
   if (res.ok) return;
   const text = await res.text().catch(() => "");
-  // The backend's error responses are {"error": "..."} — extract the
-  // actual message instead of surfacing the raw JSON blob. Falls back to
-  // the raw text for non-JSON error bodies (e.g. a proxy/gateway error).
+  // The backend's error responses are {"error": "...", "errorType": "...",
+  // "hint"?, "details"?, "position"?} — see _pylon_error_payload in
+  // pylon/server/asgi.py. Extract these instead of surfacing the raw JSON
+  // blob; falls back to the raw text for non-JSON error bodies (e.g. a
+  // proxy/gateway error), which have none of the structured fields.
   let message = text || res.statusText;
+  let errorType: string | undefined;
+  let hint: string | undefined;
+  let details: string | undefined;
+  let position: QueryErrorPosition | undefined;
   try {
-    const parsed = JSON.parse(text) as {error?: unknown};
+    const parsed = JSON.parse(text) as {
+      error?: unknown;
+      errorType?: unknown;
+      hint?: unknown;
+      details?: unknown;
+      position?: unknown;
+    };
     if (typeof parsed.error === "string") message = parsed.error;
+    if (typeof parsed.errorType === "string") errorType = parsed.errorType;
+    if (typeof parsed.hint === "string") hint = parsed.hint;
+    if (typeof parsed.details === "string") details = parsed.details;
+    if (parsed.position && typeof parsed.position === "object") position = parsed.position as QueryErrorPosition;
   } catch {
     // not JSON — keep the raw text
   }
-  throw new ApiError(res.status, message);
+  throw new ApiError(res.status, message, errorType, hint, details, position);
 };
 
 const doFetch = async <T>(path: string, init?: RequestInit): Promise<T> => {

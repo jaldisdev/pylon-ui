@@ -1,9 +1,10 @@
 import type React from "react";
 import {Loader2} from "lucide-react";
 
-import type {ValueShapeTag} from "@/lib/api/client";
+import type {QueryErrorInfo, ValueShapeTag} from "@/lib/api/client";
 import type {FloatMarkerTree} from "@/lib/api/floatMarkers";
 import {JsonTree} from "@/ui/JsonTree";
+import {QueryErrorView} from "@/ui/QueryErrorView";
 
 export interface QueryResult {
   objects: unknown[];
@@ -19,7 +20,7 @@ export interface QueryResult {
 interface ResultPanelProps {
   isRunning: boolean;
   result: QueryResult | null;
-  error: string | null;
+  error: QueryErrorInfo | null;
 }
 
 // Current query's result, rendered as a collapsible JsonTree (same component
@@ -35,11 +36,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = ({isRunning, result, erro
   }
 
   if (error) {
-    return (
-      <pre className="h-full overflow-auto p-3 font-mono text-sm whitespace-pre-wrap text-red-500">
-        {error}
-      </pre>
-    );
+    return <QueryErrorView error={error} className="h-full overflow-auto p-3" />;
   }
 
   if (!result) {

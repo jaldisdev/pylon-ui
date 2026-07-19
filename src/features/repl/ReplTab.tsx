@@ -4,7 +4,7 @@ import {useParams} from "react-router-dom";
 import {useMutation} from "@tanstack/react-query";
 import {useHotkeys} from "react-hotkeys-hook";
 
-import {api, ApiError, type ValueShapeTag} from "@/lib/api/client";
+import {api, ApiError, type QueryErrorInfo, type ValueShapeTag} from "@/lib/api/client";
 import type {FloatMarkerTree} from "@/lib/api/floatMarkers";
 import {useSchema} from "@/lib/api/useSchema";
 import {CodeEditor, type CodeEditorHandle} from "@/lib/editor/CodeEditor";
@@ -27,7 +27,7 @@ export interface HistoryEntry {
   shape?: ValueShapeTag;
   // Same "persisted before this field existed" caveat as shape above.
   floatMarkers?: FloatMarkerTree;
-  error?: string;
+  error?: QueryErrorInfo;
   isHelp?: boolean; // \help output — rendered as static text, not a query result
 }
 
@@ -106,7 +106,12 @@ export const ReplTab: React.FC = () => {
       onError: (err) => {
         setHistory((h) => [
           ...h,
-          {id: h.length, pyql: text, timestamp: Date.now(), error: err instanceof ApiError ? err.message : String(err)},
+          {
+            id: h.length,
+            pyql: text,
+            timestamp: Date.now(),
+            error: err instanceof ApiError ? err.toQueryErrorInfo() : {message: String(err)},
+          },
         ]);
       },
     });

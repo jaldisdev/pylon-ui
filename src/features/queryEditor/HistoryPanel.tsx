@@ -2,7 +2,7 @@ import type React from "react";
 import clsx from "clsx";
 import {X} from "lucide-react";
 
-import type {ValueShapeTag} from "@/lib/api/client";
+import type {QueryErrorInfo, ValueShapeTag} from "@/lib/api/client";
 
 export interface HistoryEntry {
   id: string;
@@ -16,7 +16,7 @@ export interface HistoryEntry {
   // `shape` is optional — entries persisted before it was added won't have
   // it; JsonTree falls back to a pointer-name-based guess when it's absent.
   result: {objects: unknown[]; durationMs: number; shape?: ValueShapeTag} | null;
-  error: string | null;
+  error: QueryErrorInfo | null;
 }
 
 interface HistoryPanelProps {
