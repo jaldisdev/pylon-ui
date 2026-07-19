@@ -7,6 +7,10 @@ import {resolveTupleMembers} from "@/ui/dataEditor/TupleEditor";
 // `(key := value, ...)` tuple literals the way Gel's inspector does.
 export type PointerTypeTag =
   | {kind: "scalar"; tag: string}
+  // A fixed-precision decimal — its own display convention (always at least
+  // one fractional digit, a trailing "n"), distinct from "scalar" so it
+  // doesn't also pick up a `<tag>` prefix (see ScalarValue.tsx).
+  | {kind: "decimal"}
   | {kind: "enum"; module: string; name: string}
   | {kind: "namedTuple"; members: NamedTupleMember[]}
   | {kind: "array"; element: NamedTupleMember};
@@ -45,6 +49,8 @@ export const pointerTypeTag = (
     return {kind: "array", element: pointer.element};
   }
 
+  if (pointer.typeName === "std::decimal") return {kind: "decimal"};
+
   const tag = pointer.typeName ? TAG_BY_TYPE_NAME[pointer.typeName] : undefined;
   return tag ? {kind: "scalar", tag} : null;
 };
@@ -80,6 +86,7 @@ export const memberTypeTag = (member: NamedTupleMember, schema: SchemaResponse):
   if (member.kind === "namedTuple") {
     return {kind: "namedTuple", members: resolveTupleMembers(member, schema)};
   }
+  if (member.typeName === "std::decimal") return {kind: "decimal"};
   const tag = member.typeName ? TAG_BY_TYPE_NAME[member.typeName] : undefined;
   return tag ? {kind: "scalar", tag} : null;
 };
@@ -94,6 +101,7 @@ export const memberTypeTag = (member: NamedTupleMember, schema: SchemaResponse):
 // structural (JsonTree recurses into them via valueShapeChild below instead).
 export const valueShapeToPointerTypeTag = (shape: ValueShapeTag, schema?: SchemaResponse): PointerTypeTag | null => {
   if (!shape) return null;
+  if (shape.kind === "decimal") return {kind: "decimal"};
   if (shape.kind === "enum") {
     const [module, name] = shape.enumType.split("::");
     return {kind: "enum", module, name};

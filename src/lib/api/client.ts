@@ -142,6 +142,11 @@ const connectionRequest = <T>(path: string, init?: RequestInit): Promise<T> =>
 // scalar). See pylon/query.py's shape_value_tags().
 export type ValueShapeTag =
   | {kind: "enum"; enumType: string}
+  // A fixed-precision decimal with no schema pointer behind it (a bare
+  // cast, or arithmetic over one) — the only way the frontend can tell it
+  // apart from a plain float, since both serialize identically once whole.
+  // See pylon/server/asgi.py's _merge_decimal_shape.
+  | {kind: "decimal"}
   | {kind: "namedTuple"; typeName: string | null; members: {key: string | null; shape: ValueShapeTag}[] | null}
   | {kind: "object"; typeName: string | null; pointers: Record<string, ValueShapeTag>}
   | {kind: "array"; element: ValueShapeTag}
