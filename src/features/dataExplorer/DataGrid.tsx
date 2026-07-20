@@ -65,12 +65,24 @@ interface DataGridProps {
   onNavigateInsertLink: (tempId: number, pointer: SchemaPointer) => void;
   linkEditMode?: LinkEditMode;
   // The junction (through-type)'s own properties (e.g. ProductTag.weight),
-  // shown as extra read-only columns even outside "Edit links" mode — only
-  // meaningful for a nested view of a real persisted parent (the one query
-  // shape that actually fetches `@name` values; see DataExplorerView.tsx).
-  // Ignored while linkEditMode is set, which carries its own copy (the same
+  // shown as extra columns even outside "Edit links" mode — only meaningful
+  // for a nested view of a real persisted parent (the one query shape that
+  // actually fetches `@name` values; see DataExplorerView.tsx). Ignored
+  // while linkEditMode is set, which carries its own copy (the same
   // pointers, but rendered as editable inputs instead — see LinkEditMode.throughPointers).
   viewThroughPointers?: SchemaPointer[];
+  // The parent link this nested view is showing, so a `viewThroughPointers`
+  // column can be edited in place (via `setLinkTargetProperty`) without
+  // switching to "Edit links" mode first — every row in this view is
+  // already the linked target, so there's no pick/checkbox state to show,
+  // just the property inputs. Same scope as `viewThroughPointers` (a real
+  // persisted parent, not linkEditMode) — see DataExplorerView.tsx.
+  viewLinkContext?: {
+    parentId: string | number;
+    parentObjectTypeName: string;
+    pointerName: string;
+    linkTypeName: string;
+  };
 }
 
 // Gutter, the row's own pointers, and through-type junction properties —
@@ -181,6 +193,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   onNavigateInsertLink,
   linkEditMode,
   viewThroughPointers,
+  viewLinkContext,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
@@ -557,6 +570,16 @@ export const DataGrid: React.FC<DataGridProps> = ({
                   }
                 }
               }
+            } else if (viewLinkContext && !isInsertRow) {
+              // Nested view of a real persisted parent, not in "Edit links"
+              // mode — every row here is already the linked target (no
+              // pick/checkbox state), so its through-properties are editable
+              // in place: a pending edit from this same session wins, else
+              // fall back to the value the nested-view query already fetched
+              // inline (`@name`, from viewThroughPointers' shape element).
+              const parentKey = `${viewLinkContext.parentId}__${viewLinkContext.pointerName}`;
+              const change = linkEdits.get(parentKey)?.changes.get(objectId as string);
+              linkProperties = change?.properties;
             }
 
             const onCopyToClipboard = (value: string) => {
@@ -745,35 +768,57 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     height: ROW_HEIGHT,
                   };
                   if (col.kind === "through") {
-                    if (!linkEditMode) {
-                      // Read-only view mode: the value came back inline on
-                      // the fetched row itself (`@name`, from the `@name`
-                      // shape element DataExplorerView.tsx adds — see
-                      // viewThroughPointers), not from any pending edit.
-                      const rawValue = displayRow.kind === "fetched" ? displayRow.row[`@${col.pointer.name}`] : undefined;
+                    if (linkEditMode) {
                       return (
-                        <div key={`@${col.pointer.name}`} role="gridcell" style={positionStyle} className="h-full px-2 py-2.5 font-mono">
-                          <ScalarValue value={rawValue} typeTag={pointerTypeTag(col.pointer, schema!)} schema={schema} compact />
+                        <div
+                          key={`@${col.pointer.name}`}
+                          role="gridcell"
+                          style={positionStyle}
+                          className={clsx("h-full", linkChecked ? "p-0" : "px-2 py-2.5")}
+                        >
+                          <LinkPropertyCell
+                            pointer={col.pointer}
+                            schema={schema!}
+                            value={linkProperties?.[col.pointer.name]}
+                            disabled={!linkChecked}
+                            onChange={(value) => {
+                              const {parentId, parentObjectTypeName, pointerName, linkTypeName} = linkEditMode;
+                              setLinkTargetProperty(parentId, parentObjectTypeName, pointerName, linkTypeName, objectId, col.pointer.name, value);
+                            }}
+                          />
                         </div>
                       );
                     }
+                    if (viewLinkContext && !isInsertRow) {
+                      // Same nested view, outside "Edit links" mode — still
+                      // editable in place, same as a regular property cell:
+                      // a pending edit from this session wins, else fall
+                      // back to the value already fetched inline (`@name`).
+                      const rawValue = displayRow.kind === "fetched" ? displayRow.row[`@${col.pointer.name}`] : undefined;
+                      const value: EditValue | undefined =
+                        linkProperties?.[col.pointer.name] ?? (rawValue !== undefined ? {valid: true, value: rawValue} : undefined);
+                      return (
+                        <div key={`@${col.pointer.name}`} role="gridcell" style={positionStyle} className="h-full p-0">
+                          <LinkPropertyCell
+                            pointer={col.pointer}
+                            schema={schema!}
+                            value={value}
+                            disabled={false}
+                            onChange={(newValue) => {
+                              const {parentId, parentObjectTypeName, pointerName, linkTypeName} = viewLinkContext;
+                              setLinkTargetProperty(parentId, parentObjectTypeName, pointerName, linkTypeName, objectId, col.pointer.name, newValue);
+                            }}
+                          />
+                        </div>
+                      );
+                    }
+                    // Read-only fallback (no link context at all — shouldn't
+                    // normally happen, since a through column is only added
+                    // when one of the above is set).
+                    const rawValue = displayRow.kind === "fetched" ? displayRow.row[`@${col.pointer.name}`] : undefined;
                     return (
-                      <div
-                        key={`@${col.pointer.name}`}
-                        role="gridcell"
-                        style={positionStyle}
-                        className={clsx("h-full", linkChecked ? "p-0" : "px-2 py-2.5")}
-                      >
-                        <LinkPropertyCell
-                          pointer={col.pointer}
-                          schema={schema!}
-                          value={linkProperties?.[col.pointer.name]}
-                          disabled={!linkChecked}
-                          onChange={(value) => {
-                            const {parentId, parentObjectTypeName, pointerName, linkTypeName} = linkEditMode!;
-                            setLinkTargetProperty(parentId, parentObjectTypeName, pointerName, linkTypeName, objectId, col.pointer.name, value);
-                          }}
-                        />
+                      <div key={`@${col.pointer.name}`} role="gridcell" style={positionStyle} className="h-full px-2 py-2.5 font-mono">
+                        <ScalarValue value={rawValue} typeTag={pointerTypeTag(col.pointer, schema!)} schema={schema} compact />
                       </div>
                     );
                   }

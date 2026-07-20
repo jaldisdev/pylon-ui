@@ -116,6 +116,19 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
     ? schema?.types.find((t) => `${t.module}::${t.name}` === parentPointer.through)
     : undefined;
   const throughPointers = throughType?.pointers.filter((p) => p.name !== "id");
+  // Lets a through-property column be edited in place outside "Edit links"
+  // mode too (every row here is already the linked target) — same scope as
+  // the nested-parent query branch below, the one shape that actually
+  // fetches `@name` values inline for a real persisted parent.
+  const viewLinkContext =
+    current.parent && !isInsertParent && !linkEditModeOn
+      ? {
+          parentId: current.parent.id,
+          parentObjectTypeName: current.parent.parentType,
+          pointerName: current.parent.fieldName,
+          linkTypeName: current.pylonType,
+        }
+      : undefined;
 
   const query = useMemo(() => {
     if (pointers.length === 0) return null;
@@ -458,6 +471,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
           onNavigateInsertLink={navigateInsertLink}
           linkEditMode={linkEditMode}
           viewThroughPointers={throughPointers}
+          viewLinkContext={viewLinkContext}
         />
       ) : (
         <div className="flex flex-1 items-center justify-center text-sm text-fg-muted">

@@ -107,7 +107,15 @@ export const ScalarMemberInput: React.FC<ScalarMemberInputProps> = ({
     );
   }
 
-  const internalError = validateCastValue(raw, castType);
+  // Empty means "nothing entered yet", not a format error — same convention
+  // GlobalsModal/QueryEditorTab already apply before calling
+  // validateCastValue themselves; whether that's acceptable is a
+  // required-ness question for the caller (`externalError`), not a cast-
+  // shape one. Without this guard, any optional field starts out flagged
+  // invalid the instant it's rendered, before the user has touched it —
+  // confirmed live via a junction-backed link's property cell in the Data
+  // Explorer (shows invalid the moment a new link target is picked).
+  const internalError = raw ? validateCastValue(raw, castType) : null;
   const error = externalError ?? internalError;
   const showTag = castType && !dense;
   const inputClassName = clsx(
