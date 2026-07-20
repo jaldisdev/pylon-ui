@@ -139,6 +139,10 @@ const buildLinkExpr = (
   schema: SchemaResponse
 ): {parts: {op: ":=" | "+=" | "-="; expr: string}[]; error?: string} | null => {
   const targetType = edit.linkTypeName;
+  // `+=`/`-=` (partial update) only ever apply to a true multi-link — a
+  // junction-backed single link (`pointer.kind === "link"` with
+  // `pointer.through` set) is still cardinality-one, so it always gets a
+  // full `:=` replace below, same as a plain FK-backed single link.
   const isMulti = pointer.kind === "multiLink";
 
   // `TargetType{}` is a shape query (needs a real FROM-like context, not
@@ -146,8 +150,11 @@ const buildLinkExpr = (
   // link is a cast of the empty set literal, `<TargetType>{}`.
   if (edit.setNull) return {parts: [{op: ":=", expr: `<${targetType}>{}`}]};
 
+  // Link properties (`@prop := ...`) apply to any junction-backed pointer,
+  // single or multi — decoupled from `isMulti`, which only governs
+  // +=/-= vs := below.
   const throughPointers =
-    isMulti && pointer.through ? findType(schema, pointer.through)?.pointers.filter((p) => p.name !== "id") : undefined;
+    pointer.through ? findType(schema, pointer.through)?.pointers.filter((p) => p.name !== "id") : undefined;
 
   let error: string | undefined;
 

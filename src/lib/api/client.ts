@@ -315,8 +315,11 @@ export interface SchemaPointer {
   // UI skip a required-but-defaulted property (e.g. a sequence number)
   // instead of blocking commit waiting for a value the DB will supply.
   hasDefault?: boolean;
-  // "multiLink" only, when it's a junction-typed multi-link (e.g.
-  // `MultiLink[Tag, through(ProductTag)]`) — the junction type's "module::Name".
+  // Set on a junction-typed multi-link (e.g. `MultiLink[Tag,
+  // through(ProductTag)]`) or a junction-backed single link (e.g.
+  // `Link[Org, through(Marriage)]`) — the junction type's "module::Name".
+  // A "link" pointer reports this alongside readonly/required/hasDefault;
+  // a "multiLink" pointer reports only this.
   through?: string;
 }
 
