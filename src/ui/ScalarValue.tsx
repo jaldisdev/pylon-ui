@@ -31,7 +31,7 @@ export const ScalarValue: React.FC<ScalarValueProps> = ({value, typeTag, compact
   }
 
   if (typeTag?.kind === "namedTuple") {
-    // Gel's own tuple literal syntax: `(x := 1, y := 2)` for named members,
+    // PyQL's own tuple literal syntax: `(x := 1, y := 2)` for named members,
     // `(1, 2)` for positional ones — never JSON braces/brackets.
     const members = typeTag.members;
     const positional = members.every((m) => m.name === null);
@@ -111,7 +111,7 @@ export const ScalarValue: React.FC<ScalarValueProps> = ({value, typeTag, compact
     // A whole-number float/decimal (e.g. 1.0) is otherwise indistinguishable
     // from a plain int once JSON.parse collapses both to the same JS number
     // — force the trailing ".0" back on when we know (via forceFloat) that
-    // the original literal had one, matching EdgeQL/Gel's own float display.
+    // the original literal had one, matching PyQL's own float display.
     const text = forceFloat && Number.isInteger(value) ? `${value}.0` : String(value);
     return <span className="text-(--syntax-number)">{text}</span>;
   }

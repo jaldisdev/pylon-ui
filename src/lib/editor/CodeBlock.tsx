@@ -12,8 +12,7 @@ import {highlightStyle} from "@/lib/editor/theme";
 // `syntaxHighlighting(highlightStyle)` extension does this as a side effect
 // of building an EditorView; this component bypasses EditorView entirely
 // (it's a plain read-only syntax-highlighted string, not an editor), so the
-// stylesheet needs mounting directly instead. Ported from gel-ui's
-// shared/common/ui/codeBlock — same approach, same theme module.
+// stylesheet needs mounting directly instead.
 if (highlightStyle.module) {
   StyleModule.mount(document, highlightStyle.module);
 }
@@ -38,8 +37,7 @@ export interface CodeBlockProps {
 // `customRanges` lets a caller splice a decoration (or a fully custom
 // renderer) over an arbitrary byte range of the source, e.g. the Review
 // Changes modal replacing each `$paramName` reference with its resolved
-// value. Ported from gel-ui's shared/common/ui/codeBlock, which the Data
-// Explorer's "review changes" flow is itself modeled on.
+// value.
 export const CodeBlock: React.FC<CodeBlockProps> = ({code, language, customRanges, inline, className}) => {
   const tree = (language ?? pyqlLanguage).parser.parse(code);
 

@@ -34,9 +34,8 @@ const DRAFT_PARAMS_KEY = "pylon-ui-query-draft-params";
 
 // Query Editor: a PyQL input and its result, in a resizable split (toggle
 // between side-by-side and stacked), a parameters panel for $name params,
-// and a query history side panel persisted to localStorage (matching Gel's
-// UI). Modeled on gel-ui's Query Editor tab, trimmed to PyQL-only (no SQL/
-// Visual-Builder modes, no explain).
+// and a query history side panel persisted to localStorage. PyQL-only (no
+// SQL/Visual-Builder modes, no explain).
 export const QueryEditorTab: React.FC = () => {
   const editorRef = useRef<CodeEditorHandle>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -44,9 +43,9 @@ export const QueryEditorTab: React.FC = () => {
   const {data: schema} = useSchema();
 
   // sessionStorage (not localStorage) — survives switching to another tab
-  // (e.g. Data Explorer to look up an id) and back, but not closing the tab,
-  // matching Gel's own "current input + params" draft persistence, distinct
-  // from the permanent (localStorage) history below.
+  // (e.g. Data Explorer to look up an id) and back, but not closing the tab:
+  // a "current input + params" draft, distinct from the permanent
+  // (localStorage) history below.
   const [queryText, setQueryText] = useSessionStorageState(DRAFT_TEXT_KEY, "");
   const [paramValues, setParamValues] = useSessionStorageState<Record<string, string>>(DRAFT_PARAMS_KEY, {});
   const [orientation, setOrientation] = useState<Orientation>("horizontal");

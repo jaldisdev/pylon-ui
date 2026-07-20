@@ -7,8 +7,8 @@ import {defaultMemberValue, MemberEditor} from "@/ui/dataEditor/TupleEditor";
 // Editor for a one-dimensional array<T> value — one row per element (each
 // using the same per-kind widget a tuple member gets, via MemberEditor) plus
 // a trailing remove button, and a dashed "add" row to append a new element.
-// Mirrors gel-ui's ArrayEditor: a bordered panel with a small "array" corner
-// label, rows butted up against their own remove button.
+// A bordered panel with a small "array" corner label, rows butted up
+// against their own remove button.
 interface ArrayEditorProps {
   element: NamedTupleMember;
   schema: SchemaResponse;

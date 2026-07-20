@@ -19,11 +19,11 @@ interface ReviewEditsModalProps {
 
 // Shows every pending edit as the real generated PyQL it'll run — confirm
 // (executes the single combined query and clears all edits) or withdraw
-// (discards everything), matching gel-ui's Review Changes modal. Like
-// gel-ui, each `<type>$paramName` reference is decorated in place with its
-// real resolved value instead of showing the raw placeholder — the query
-// still executes with real bound params underneath (see api.runQuery below),
-// this is purely a display substitution over the syntax-highlighted code.
+// (discards everything). Each `<type>$paramName` reference is decorated in
+// place with its real resolved value instead of showing the raw
+// placeholder — the query still executes with real bound params underneath
+// (see api.runQuery below), this is purely a display substitution over the
+// syntax-highlighted code.
 export const ReviewEditsModal: React.FC<ReviewEditsModalProps> = ({onClose}) => {
   const {data: schema} = useSchema();
   const queryClient = useQueryClient();
@@ -61,7 +61,7 @@ export const ReviewEditsModal: React.FC<ReviewEditsModalProps> = ({onClose}) => 
       onClose();
     } catch (e) {
       // Deliberately not clearing edits on failure — the user should be able
-      // to fix/undo and retry, matching gel-ui.
+      // to fix/undo and retry.
       setCommitError(e instanceof Error ? e.message : String(e));
     } finally {
       setCommitting(false);
@@ -74,7 +74,7 @@ export const ReviewEditsModal: React.FC<ReviewEditsModalProps> = ({onClose}) => 
   };
 
   // DataExplorerTab's own Mod+S opens this modal; pressing it again while
-  // already open commits instead, mirroring Gel's own Review Changes modal.
+  // already open commits instead.
   useHotkeys(
     "mod+s",
     (event) => {
@@ -128,9 +128,9 @@ export const ReviewEditsModal: React.FC<ReviewEditsModalProps> = ({onClose}) => 
                       // own member types aren't shown anywhere else, so their
                       // tags/quotes must stay intact).
                       const displayTypeTag = typeTag?.kind === "scalar" ? null : typeTag;
-                      // Two-tone pill matching gel-ui's Review Changes look:
-                      // the cast prefix sits on a muted capsule, the resolved
-                      // value on a lighter inset segment butted up against it.
+                      // Two-tone pill: the cast prefix sits on a muted
+                      // capsule, the resolved value on a lighter inset
+                      // segment butted up against it.
                       return (
                         <span className="inline-flex h-[22px] items-center overflow-hidden rounded-full bg-surface-active pl-1.5 align-middle">
                           <span className="whitespace-pre">{children}</span>

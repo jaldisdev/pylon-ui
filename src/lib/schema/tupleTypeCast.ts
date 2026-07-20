@@ -35,7 +35,7 @@ export const resolveArrayParamElement = (
 };
 
 // Inverse of parseTupleElement/parseTypeText below — renders a structural
-// tuple's member list back out as PyQL/EdgeQL `tuple<...>` syntax (e.g.
+// tuple's member list back out as PyQL `tuple<...>` syntax (e.g.
 // "tuple<street: std::str, zip: std::str>"), for display in places like the
 // Data Explorer's column headers where a nominal tuple's `target` name isn't
 // available. Recurses for a nested structural tuple member.

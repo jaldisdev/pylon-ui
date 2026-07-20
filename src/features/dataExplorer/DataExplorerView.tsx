@@ -66,7 +66,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
   const [filterOpen, setFilterOpen] = useState(false);
   // "Edit links" mode for a nested link view — while on, the grid shows
   // every object of the target type (not just currently-linked ones) with a
-  // checkbox/radio per row, matching gel-ui's link-picker-is-the-grid design.
+  // checkbox/radio per row: the link picker *is* the grid.
   const [linkEditModeOn, setLinkEditModeOn] = useState(false);
   // Ends "Edit links" mode once a commit (or "Discard all") clears every
   // pending edit — a true->false transition specifically, not just "no
@@ -82,8 +82,8 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
   const insertEdits = useDataEditsStore((s) => s.insertEdits);
 
   // A pending (not-yet-saved) insert row has no persisted uuid to nest under
-  // — matching Gel's own convention, its position among same-type pending
-  // inserts (0, 1, 2, ...) addresses it in the URL instead (see
+  // — its position among same-type pending inserts (0, 1, 2, ...) addresses
+  // it in the URL instead (see
   // navigateInsertLink below, and stack.ts's parseInsertIndex). Resolved
   // back to the pending insert's real temp id here, since that's what the
   // edits store actually keys link edits by.
@@ -257,7 +257,7 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
 
   // Same nested-view navigation as navigateLink, but for a pending insert
   // row — addressed by its position among same-type pending inserts rather
-  // than a (nonexistent) persisted id, matching Gel's own convention.
+  // than a (nonexistent) persisted id.
   const navigateInsertLink = (tempId: number, pointer: SchemaPointer) => {
     const sameType = Array.from(insertEdits.values()).filter((ins) => ins.objectTypeName === current.pylonType);
     const index = sameType.findIndex((ins) => ins.id === tempId);
@@ -299,8 +299,8 @@ export const DataExplorerView: React.FC<DataExplorerViewProps> = ({stack, basePa
     );
   };
 
-  // Matches Gel's own Mod+P object-type quick-switcher — only meaningful at
-  // the root view, where ObjectTypeSelect itself is shown.
+  // Mod+P object-type quick-switcher — only meaningful at the root view,
+  // where ObjectTypeSelect itself is shown.
   useHotkeys(
     "mod+p",
     (event) => {

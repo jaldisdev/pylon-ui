@@ -6,7 +6,7 @@ interface HighlightedTextProps {
 }
 
 // Renders `text` with the characters at `indices` highlighted — the matched
-// letters in a fuzzy-search result, Gel's Cmd+P style.
+// letters in a fuzzy-search result, quick-switcher style.
 export const HighlightedText: React.FC<HighlightedTextProps> = ({text, indices}) => {
   const indexSet = new Set(indices);
 

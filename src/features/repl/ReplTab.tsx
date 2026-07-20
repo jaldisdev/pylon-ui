@@ -33,8 +33,8 @@ export interface HistoryEntry {
 
 const sameDay = (a: number, b: number) => new Date(a).toDateString() === new Date(b).toDateString();
 
-// REPL: a Pylon ASCII banner, a scrollback of `branch[pyql]> query` entries
-// (Gel-style), and a terminal-flavored prompt line at the bottom. Supports
+// REPL: a Pylon ASCII banner, a scrollback of `branch[pyql]> query` entries,
+// and a terminal-flavored prompt line at the bottom. Supports
 // \help/\clear commands and Mod+ArrowUp/Down history navigation, matching
 // the shortcuts the banner itself advertises.
 export const ReplTab: React.FC = () => {
@@ -42,7 +42,7 @@ export const ReplTab: React.FC = () => {
   const editorRef = useRef<CodeEditorHandle>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   // localStorage (not sessionStorage) — persists across reloads until
-  // \clear, matching Gel's own REPL history persistence.
+  // \clear.
   const [history, setHistory] = useLocalStorageState<HistoryEntry[]>(HISTORY_STORAGE_KEY, []);
   const [historyIndex, setHistoryIndex] = useState<number | null>(null);
   const draftBeforeHistoryRef = useRef("");
@@ -50,9 +50,8 @@ export const ReplTab: React.FC = () => {
   const {data: schema} = useSchema();
 
   // Keep the newest entry (and the prompt line below it) in view as history
-  // grows — gel-ui achieves this via a virtualized list's scroll-position
-  // bookkeeping; a plain scrollTop bump after each render is equivalent for
-  // our non-virtualized, session-sized history.
+  // grows — a plain scrollTop bump after each render is sufficient for our
+  // non-virtualized, session-sized history.
   useEffect(() => {
     scrollRef.current?.scrollTo({top: scrollRef.current.scrollHeight});
   }, [history]);
@@ -183,11 +182,9 @@ export const ReplTab: React.FC = () => {
   );
 
   // Output — normal top-to-bottom flow: banner always first, entries in
-  // chronological order, prompt line last — matching gel-ui's actual REPL
-  // structure (confirmed by reading shared/studio/tabs/repl/index.tsx
-  // directly: ReplHeader always precedes the history items, and ReplInput
-  // is a plain sibling *after* the scrollback content, not a reversed/
-  // pinned element). The useEffect above keeps it scrolled to the bottom.
+  // chronological order, prompt line last (a plain sibling after the
+  // scrollback content, not a reversed/pinned element). The useEffect above
+  // keeps it scrolled to the bottom.
   return (
     <Card>
       <div ref={scrollRef} className="flex flex-1 flex-col overflow-auto p-3">

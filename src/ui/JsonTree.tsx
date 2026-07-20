@@ -61,8 +61,8 @@ const stripInternal = (value: unknown): unknown => {
   return value;
 };
 
-// Collapsible tree view for query results, modeled on Gel's inspector:
-// toggleable object/array nodes, a "Copy JSON" button on row hover, and
+// Collapsible tree view for query results — toggleable object/array nodes,
+// a "Copy JSON" button on row hover, and
 // `<uuid>`/`<std::datetime>`/`module::Enum.Member` tags resolved from real
 // schema data (see src/lib/schema/typeTags.ts) rather than guessed from the
 // value's shape.
@@ -164,7 +164,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({
   const linkPointer = ownPointer && (ownPointer.kind === "link" || ownPointer.kind === "multiLink") ? ownPointer : undefined;
 
   // A tuple/named-tuple value is JS-object-shaped (a dict or array) but
-  // renders as a single Gel-style literal `(x := 1, y := 2)`, not as an
+  // renders as a single tuple literal `(x := 1, y := 2)`, not as an
   // expandable tree node — this check must come before the generic
   // object/array branch below, which would otherwise treat it as one.
   if (valueShape?.kind === "namedTuple") {
@@ -182,14 +182,14 @@ const JsonNode: React.FC<JsonNodeProps> = ({
   if (value !== null && typeof value === "object") {
     const isArray = Array.isArray(value);
     // A free object (no schema type at all — e.g. `select { test := 1 }`)
-    // still gets a label, matching Gel's own "Object {...}" convention for
-    // an untyped shape, rather than showing no label at all.
+    // still gets a label ("Object {...}") for an untyped shape, rather than
+    // showing no label at all.
     const pylonType = !isArray ? ((value as {__pylon_type__?: string}).__pylon_type__ ?? ownTypeOverride ?? "Object") : undefined;
     const entries = isArray
       ? (value as unknown[]).map((v, i) => [String(i), v] as const)
       : Object.entries(value as Record<string, unknown>).filter(([k]) => k !== "__pylon_type__");
-    // A multi-link is a *set*, not a list — Gel/EdgeQL convention displays
-    // it with {}/{} like any other object collection, not []/[] (reserved
+    // A multi-link is a *set*, not a list — displayed with {}/{} like any
+    // other object collection, not []/[] (reserved
     // for a real array<T> property), even though the JS value itself is a
     // plain array either way. The root array is always a query's own result
     // set too (see isRoot above), for the same reason.

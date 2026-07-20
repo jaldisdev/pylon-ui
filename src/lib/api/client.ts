@@ -134,7 +134,7 @@ const connectionRequest = <T>(path: string, init?: RequestInit): Promise<T> =>
 
 // A position-free "value shape" tag tree, aligned with the already-decoded
 // JSON in QueryResponse.objects (not the compiler's position-based
-// ShapeNode) — lets JsonTree render type tags (`<uuid>`, enum labels, Gel's
+// ShapeNode) — lets JsonTree render type tags (`<uuid>`, enum labels, the
 // `(x := 1, y := 2)` tuple literal syntax) for values that aren't a known
 // schema pointer, e.g. a bare top-level cast or a tuple nested inside a free
 // object, the same way it already does for object properties via
@@ -236,7 +236,7 @@ export interface AiChatResponse {
 
 export interface StatsResponse {
   // Live-tuple estimate from Postgres's own stats (pg_stat_user_tables), not
-  // an exact count — matches Gel's own dashboard tradeoff.
+  // an exact count — a deliberate accuracy/cost tradeoff for a dashboard tile.
   objects: number;
   // Every registered schema type (concrete, abstract, interface, junction)
   // plus registered custom scalars.
@@ -301,7 +301,7 @@ export interface SchemaPointer {
   // NamedTupleMember, reused so scalar/enum/namedTuple element types all
   // classify identically to a tuple member's own type.
   element?: NamedTupleMember;
-  // Canonical PyQL/EdgeQL-style type name for "property"/"computed" pointers
+  // Canonical PyQL type name for "property"/"computed" pointers
   // (e.g. "std::str", "std::uuid", "cal::local_date") — shown below the
   // pointer name in the Data Explorer's column headers, and used to decide
   // which types get a `<tag>` prefix on values (see lib/schema/typeTags.ts).

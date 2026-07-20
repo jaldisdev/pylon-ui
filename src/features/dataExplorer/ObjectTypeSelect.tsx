@@ -11,8 +11,8 @@ interface ObjectTypeSelectProps {
   types: SchemaType[];
   selected: SchemaType | null;
   onSelect: (type: SchemaType) => void;
-  // Controlled so DataExplorerView's Mod+P hotkey (matching Gel's own type
-  // quick-switcher) can open this from outside a click on the button itself.
+  // Controlled so DataExplorerView's Mod+P hotkey (a type quick-switcher)
+  // can open this from outside a click on the button itself.
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -33,8 +33,8 @@ export const ObjectTypeSelect: React.FC<ObjectTypeSelectProps> = ({types, select
     return () => document.removeEventListener("mousedown", onClick);
   }, [open, onOpenChange]);
 
-  // Fuzzy-match + rank by quality (contiguous/early matches first), the way
-  // Gel's Cmd+P type search does — not just a plain substring filter.
+  // Fuzzy-match + rank by quality (contiguous/early matches first) — not
+  // just a plain substring filter.
   const filtered = useMemo(() => {
     return types
       .map((type) => ({type, match: fuzzyMatch(search, `${type.module}::${type.name}`)}))

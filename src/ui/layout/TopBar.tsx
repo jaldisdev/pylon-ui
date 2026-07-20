@@ -21,7 +21,7 @@ const THEME_ICON: Record<Theme, typeof Sun> = {
 };
 
 // Top bar: project name / connection breadcrumb on the left, theme toggle on
-// the right — matching Gel's breadcrumb nav (instance / database / ...).
+// the right (instance / database / ...).
 export const TopBar: React.FC = () => {
   const {data: connections} = useConnections();
   const {theme, setTheme} = useTheme();
@@ -111,8 +111,7 @@ export const TopBar: React.FC = () => {
         {/* Fixed-size placeholder reserves this button's normal-flow slot —
             the actual pill below is absolutely positioned within it, so its
             click-triggered expansion never shifts the Settings button (or
-            anything else) — it only ever overlays the space to its left,
-            matching Gel's own expanding theme switcher. */}
+            anything else) — it only ever overlays the space to its left. */}
         <div ref={themeMenuRef} className="relative h-8 w-8">
           <div
             className={clsx(

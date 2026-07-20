@@ -11,8 +11,8 @@ const findType = (schema: SchemaResponse, qualname: string) => {
 };
 
 // Parses the URL's nested-path tail (rootType/id/field/id/field/...) into a
-// stack of views, resolving each level's target type via the schema — the
-// same deep-linkable scheme gel-ui uses, confirmed against a real gel-ui URL:
+// stack of views, resolving each level's target type via the schema — a
+// deep-linkable scheme, e.g.:
 // /main/data/account::Account/<id>/contacts/<id>/default_address
 export const parseStack = (schema: SchemaResponse, splat: string): StackEntry[] | null => {
   const parts = splat.split("/").filter(Boolean);
@@ -43,8 +43,8 @@ export const stackToPath = (stack: StackEntry[]): string =>
   [stack[0].pylonType, ...stack.slice(1).flatMap((e) => [e.parent!.id, e.parent!.fieldName])].join("/");
 
 // A pending (not-yet-saved) insert row has no persisted uuid to address by —
-// matching Gel's own convention (confirmed against a real gel-ui URL:
-// /main/data/account::Individual/0/emails), its position among same-type
-// pending inserts (0, 1, 2, ...) is used as the URL segment instead. A real
-// object's id is always a hyphenated uuid, so this is unambiguous.
+// e.g. /main/data/account::Individual/0/emails — its position among
+// same-type pending inserts (0, 1, 2, ...) is used as the URL segment
+// instead. A real object's id is always a hyphenated uuid, so this is
+// unambiguous.
 export const parseInsertIndex = (id: string): number | null => (/^\d+$/.test(id) ? Number(id) : null);

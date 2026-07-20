@@ -63,8 +63,7 @@ export const ArrayPopover: React.FC<ArrayPopoverProps> = ({element, schema, init
           align="start"
           // Shifts the popover up by the grid row's own height (see
           // DataGrid.tsx's ROW_HEIGHT) so it overlays the cell from its top
-          // edge instead of floating below a now-blank collapsed cell —
-          // matching Gel's own tuple/array editor placement.
+          // edge instead of floating below a now-blank collapsed cell.
           sideOffset={-42}
           onEscapeKeyDown={discard}
           onPointerDownOutside={commit}

@@ -1,6 +1,6 @@
 export interface FuzzyMatch {
   // Indices in `target` that matched a query character, in order — used to
-  // highlight matched characters the way Gel's Cmd+P type search does.
+  // highlight matched characters in the quick-switcher's own result list.
   indices: number[];
   // Lower is better: rewards contiguous, early matches over scattered ones.
   score: number;

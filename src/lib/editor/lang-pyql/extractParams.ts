@@ -6,19 +6,18 @@ import {getAllChildren, getNodeText} from "@/lib/editor/lang-pyql/syntaxTree";
 export interface ExtractedParam {
   name: string;
   // Raw cast-type text (e.g. "int64", "str", "uuid") when the param has a
-  // leading cast (`<int64>$age`), else null. Unlike gel-ui's equivalent, this
-  // isn't resolved against a schema-scalar registry — it's just enough to
-  // pick a reasonable coercion rule (see coerceParamValue below). Reflects
-  // the *first* occurrence of this param name in the query.
+  // leading cast (`<int64>$age`), else null. Not resolved against a
+  // schema-scalar registry — it's just enough to pick a reasonable coercion
+  // rule (see coerceParamValue below). Reflects the *first* occurrence of
+  // this param name in the query.
   castType: string | null;
-  // A bare cast (`<uuid>$x`) or no cast at all is implicitly required in
-  // PyQL/EdgeQL; only an explicit `<optional ...>` makes it optional.
+  // A bare cast (`<uuid>$x`) or no cast at all is implicitly required;
+  // only an explicit `<optional ...>` makes it optional.
   required: boolean;
   // Set when this param name is used with a different cast (type or
   // optionality) elsewhere in the same query, e.g.
-  // `.id = <uuid>$account or .id = <optional uuid>$account` — matches Gel's
-  // own validation error for this case, since a single bound value can't
-  // satisfy two different casts at once.
+  // `.id = <uuid>$account or .id = <optional uuid>$account` — a single
+  // bound value can't satisfy two different casts at once.
   castConflict: string | null;
 }
 
@@ -59,10 +58,9 @@ const extractCastForm = (query: string, cast: SyntaxNode): CastForm => {
 // ("default") lexes as a Keyword, and having *two* keyword-like tokens in a
 // row (the "optional" keyword slot, then the module-as-keyword) breaks the
 // grammar's error recovery badly enough that no Cast node is produced at
-// all (confirmed against gel-ui's own identical lang-edgeql grammar too —
-// not a PyQL-specific bug). The raw text is unambiguous even when the tree
-// isn't, so this reads the cast straight off the substring immediately
-// before the parameter instead of walking the (malformed) tree.
+// all. The raw text is unambiguous even when the tree isn't, so this reads
+// the cast straight off the substring immediately before the parameter
+// instead of walking the (malformed) tree.
 const CAST_TEXT_RE = /<\s*(optional|required)?\s*([^<>]+?)\s*>\s*$/i;
 
 const extractCastFormFromText = (query: string, paramStart: number): CastForm => {

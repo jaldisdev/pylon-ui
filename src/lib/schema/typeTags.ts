@@ -4,7 +4,7 @@ import {resolveTupleMembers} from "@/ui/dataEditor/TupleEditor";
 // A pointer's inferred display type, resolved from real schema data (not a
 // value-shape guess) — used by JsonTree/ScalarValue to show `<uuid>`/
 // `<std::datetime>` tags, `module::Enum.Member` labels, and
-// `(key := value, ...)` tuple literals the way Gel's inspector does.
+// `(key := value, ...)` tuple literals.
 export type PointerTypeTag =
   | {kind: "scalar"; tag: string}
   // A fixed-precision decimal — its own display convention (always at least
@@ -16,9 +16,9 @@ export type PointerTypeTag =
   | {kind: "array"; element: NamedTupleMember};
 
 // Only these typeNames get a `<tag>` prefix on their value — plain str/int/
-// bool/json are self-evident from their JS type already. Tag text matches
-// the (slightly inconsistent, short-vs-qualified) style seen in Gel's own
-// inspector: `<uuid>` but `<std::datetime>`.
+// bool/json are self-evident from their JS type already. Tag text is
+// deliberately inconsistent, short vs. qualified: `<uuid>` but
+// `<std::datetime>`.
 const TAG_BY_TYPE_NAME: Record<string, string> = {
   "std::uuid": "uuid",
   "std::datetime": "std::datetime",

@@ -3,8 +3,7 @@ import {persist} from "zustand/middleware";
 
 export interface GlobalEntry {
   // The value always stays here regardless of `enabled` — disabling a global
-  // never discards it, it just stops being sent, matching Gel's own globals
-  // panel toggle.
+  // never discards it, it just stops being sent.
   value: unknown;
   enabled: boolean;
 }

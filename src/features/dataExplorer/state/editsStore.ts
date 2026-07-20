@@ -1,16 +1,15 @@
 import {create} from "zustand";
 
-// Data Explorer edit-tracking state — a plain-Zustand port of gel-ui's
-// DataEditingManager (shared/studio/tabs/dataview/state/edits.ts). gel-ui
-// wraps this in a MobX-keystone model purely for context injection
-// (findParent/dbCtx) — the actual data (four Maps/Sets) is plain MobX state
-// with no keystone-specific behavior, so it ports mechanically here.
+// Data Explorer edit-tracking state — four plain Zustand-managed Maps/Sets
+// (property edits, link edits, pending inserts, pending deletes) tracking
+// every not-yet-committed change against the schema, independent of any
+// particular component's lifecycle.
 //
 // A module-level singleton (not component state) so it survives
 // DataExplorerTab's remount-via-`key` pattern on stack navigation — edits
 // made on one type must still be visible after drilling into/back out of a
-// nested link view. Never persisted (matches gel-ui: reload loses pending
-// edits, same as leaving the page in Gel's own studio).
+// nested link view. Never persisted — a reload loses pending edits, same as
+// leaving the page.
 
 // The value of one pending property edit — either a successfully parsed/cast
 // value ready to bind as a query param, or the raw text plus why it failed,
@@ -414,7 +413,7 @@ export const useDataEditsStore = create<DataEditsState>()((set, get) => ({
 }));
 
 // Gates the Review Changes button's *existence* (not just its enabled
-// state), matching gel-ui's `hasPendingEdits` computed exactly.
+// state) — true whenever any of the four edit maps/sets is non-empty.
 export const useHasPendingEdits = (): boolean =>
   useDataEditsStore(
     (s) => s.propertyEdits.size > 0 || s.linkEdits.size > 0 || s.insertEdits.size > 0 || s.deleteEdits.size > 0

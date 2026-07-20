@@ -11,12 +11,11 @@ import {ArrayPopover} from "@/ui/dataEditor/ArrayPopover";
 import {ScalarMemberInput} from "@/ui/dataEditor/ScalarMemberInput";
 
 // Inline per-scalar-type cell editor, mounted in place of a grid cell on
-// double-click — mirrors gel-ui's dataEditor component library
-// (shared/studio/components/dataEditor/*): bool -> two pill buttons, enum ->
-// dropdown, str/json -> auto-growing textarea, array<T> -> ArrayPopover,
-// everything else -> a plain validated text input. No date-picker anywhere,
-// matching gel-ui exactly — dates/times are free-text validated against the
-// same regexes the Query Editor's params already use.
+// double-click: bool -> two pill buttons, enum -> dropdown, str/json ->
+// auto-growing textarea, array<T> -> ArrayPopover, everything else -> a
+// plain validated text input. No date-picker anywhere — dates/times are
+// free-text validated against the same regexes the Query Editor's params
+// already use.
 interface DataEditorCellProps {
   pointer: SchemaPointer;
   schema: SchemaResponse;
@@ -132,11 +131,10 @@ export const DataEditorCell: React.FC<DataEditorCellProps> = ({pointer, schema, 
           <TextEditor pointer={pointer} initialValue={initialValue} onCommit={commitIfChanged} boundaryRef={rootRef} />
         )}
       </div>
-      {/* Optional pointers get an explicit "clear to {}" action, matching
-          gel-ui's tan pill button — the only way to blank an optional value
-          rather than typing something. Immediately commits (no separate
-          "empty mode"), matching gel-ui's onClose(false)-on-click behavior. A
-          tuple/array pointer renders this same action *inside* its own
+      {/* Optional pointers get an explicit "clear to {}" pill button — the
+          only way to blank an optional value rather than typing something.
+          Immediately commits (no separate "empty mode"). A tuple/array
+          pointer renders this same action *inside* its own
           popover instead (see the `optional` prop above) — the popover is
           portalled and floats away from this collapsed cell once expanded,
           so a button left behind here would look detached from it.

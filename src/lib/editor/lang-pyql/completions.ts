@@ -5,12 +5,11 @@ import type {SyntaxNode} from "@lezer/common";
 
 import type {SchemaResponse, SchemaType} from "@/lib/api/client";
 
-// Type-name autocomplete after select/insert/update/delete — adapted from
-// gel-ui's shared/codeEditor/completions.ts (same grammar shape: Script >
-// Statement > Keyword/Name, confirmed by inspecting our own parse tree).
-// Deliberately scoped to just this one branch for now — gel-ui's completions
-// also cover property/link names inside `{ }` shape braces, a separate,
-// larger feature not asked for here.
+// Type-name autocomplete after select/insert/update/delete (grammar shape:
+// Script > Statement > Keyword/Name, confirmed by inspecting our own parse
+// tree). Deliberately scoped to just this one branch for now — completing
+// property/link names inside `{ }` shape braces too is a separate, larger
+// feature not asked for here.
 
 const sliceDoc = (doc: Text, range: {from: number; to: number}) => doc.sliceString(range.from, range.to);
 

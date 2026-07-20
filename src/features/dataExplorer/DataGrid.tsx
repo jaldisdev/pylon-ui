@@ -23,7 +23,7 @@ type Row = Record<string, unknown>;
 
 // A displayed row is either fetched from the server or a not-yet-saved
 // pending insert (sourced from the edits store, not the query result) —
-// spliced onto the front of the grid, matching gel-ui's insertedRows.
+// spliced onto the front of the grid.
 type DisplayRow = {kind: "fetched"; row: Row} | {kind: "insert"; tempId: number};
 
 // Link/multi-link "edit mode" for a nested link view — swaps the gutter's
@@ -94,7 +94,7 @@ const columnKey = (col: GridColumn): string =>
   col.kind === "gutter" ? "__gutter__" : col.kind === "through" ? `@${col.pointer.name}` : col.pointer.name;
 
 // Only plain scalar/enum properties (other than id) are sortable — links,
-// multi-links, and computed pointers aren't, matching gel-ui's grid.
+// multi-links, and computed pointers aren't.
 const isSortable = (pointer: SchemaPointer) =>
   (pointer.kind === "property" || pointer.kind === "enum") && pointer.name !== "id";
 
@@ -130,8 +130,8 @@ const ID_COLUMN_WIDTH_MOBILE = 180;
 
 // Non-computed, non-id property/enum/namedTuple/array cells are
 // double-click editable. A readonly pointer is still settable once, at
-// insert time — only post-creation updates are blocked (matches
-// Pylon/gel-ui's readonly rule).
+// insert time — only post-creation updates are blocked (Pylon's own
+// readonly rule).
 const isEditableCell = (pointer: SchemaPointer, isInsertRow: boolean) =>
   (pointer.kind === "property" || pointer.kind === "enum" || pointer.kind === "namedTuple" || pointer.kind === "array") &&
   pointer.name !== "id" &&
@@ -157,8 +157,7 @@ const scalarPointerNames = (pointers: SchemaPointer[]): string =>
 // cyclic/self-referential links (e.g. Person.friends: MultiLink[Person]),
 // and a blind deep splat risks either runaway recursion or a very large
 // result depending on how well pylon-core's own cycle handling holds up —
-// matches gel-ui's own row-expansion inspector, which takes the same
-// one-level-plus-lazy-load approach rather than a blind full-depth fetch.
+// a one-level-plus-lazy-load approach instead of a blind full-depth fetch.
 const buildExpandedRowShape = (schemaType: SchemaType, schema: SchemaResponse): string =>
   schemaType.pointers
     .map((p) => {
@@ -174,13 +173,11 @@ const buildExpandedRowShape = (schemaType: SchemaType, schema: SchemaResponse): 
     .join(", ");
 
 // Virtualized (rows *and* columns) data grid — a div-based rewrite of the old
-// <table>-based grid, matching Gel's own architecture: cells are absolutely
-// positioned via computed offsets from two @tanstack/react-virtual instances
-// (one vertical, one horizontal) instead of relying on table/colgroup layout.
-// Pinned columns (gutter, and id on desktop) are grouped into one
-// `position: sticky; left: 0` block per row/header, mirroring Gel's
-// pinnedHeaders/pinnedContent — never virtualized, since it's always a small
-// fixed set.
+// <table>-based grid: cells are absolutely positioned via computed offsets
+// from two @tanstack/react-virtual instances (one vertical, one horizontal)
+// instead of relying on table/colgroup layout. Pinned columns (gutter, and
+// id on desktop) are grouped into one `position: sticky; left: 0` block per
+// row/header — never virtualized, since it's always a small fixed set.
 export const DataGrid: React.FC<DataGridProps> = ({
   pylonType,
   pointers,
@@ -251,11 +248,11 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const setLinkTargetProperty = useDataEditsStore((s) => s.setLinkTargetProperty);
 
   // A pending insert also shows on every ancestor type's own grid view (not
-  // just its own concrete type) — matching Gel: inserting a Person on the
-  // abstract Account grid stays visible there (only Account's own pointers
-  // editable) and again once you drill into the concrete Person type (its
-  // additional pointers now editable too), rather than only ever appearing
-  // after switching to the concrete type.
+  // just its own concrete type): inserting a Person on the abstract Account
+  // grid stays visible there (only Account's own pointers editable) and
+  // again once you drill into the concrete Person type (its additional
+  // pointers now editable too), rather than only ever appearing after
+  // switching to the concrete type.
   const displayRows = useMemo<DisplayRow[]>(() => {
     const viewedType = schema?.types.find((t) => qualname(t) === pylonType);
     const pendingInserts = Array.from(insertEdits.values()).filter((ins) => {
@@ -276,11 +273,11 @@ export const DataGrid: React.FC<DataGridProps> = ({
     return all.filter((r) => (r.kind === "insert" ? r.tempId : ((r.row.id as string | undefined) ?? "")) !== linkEditMode.parentId);
   }, [insertEdits, pylonType, rows, linkEditMode, schema]);
 
-  // Row expansion (gel-ui style inline object inspector) — keyed by real
-  // object id, so only fetched rows (never pending inserts, which have no
-  // real id yet) can expand. Collapsing forgets it entirely (not just
-  // hiding it) so re-expanding the same row later refetches rather than
-  // showing stale data, matching gel-ui's own behavior.
+  // Row expansion (inline object inspector) — keyed by real object id, so
+  // only fetched rows (never pending inserts, which have no real id yet)
+  // can expand. Collapsing forgets it entirely (not just hiding it) so
+  // re-expanding the same row later refetches rather than showing stale
+  // data.
   const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(new Set());
   const toggleRowExpanded = (objectId: string) =>
     setExpandedRowIds((prev) => {
@@ -331,7 +328,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
 
   // Pinned prefix: gutter always, id too on desktop (un-stickies on mobile,
   // where the gutter becomes the last pinned column instead) — assumes id is
-  // the first pointer when present, matching the Pylon/Gel convention.
+  // the first pointer when present, matching Pylon's own schema convention.
   const pinnedCount = !isMobile && pointers[0]?.name === "id" ? 2 : 1;
   const pinnedColumns = allColumns.slice(0, pinnedCount);
   const scrollableColumns = allColumns.slice(pinnedCount);
@@ -649,15 +646,15 @@ export const DataGrid: React.FC<DataGridProps> = ({
                   className={clsx(
                     "h-full shrink-0 font-mono",
                     // Editing drops the cell's own padding so the editor
-                    // inside (ScalarMemberInput et al.) can sit flush against
-                    // the cell's edges, matching Gel's own inline editor
-                    // look, instead of being inset within it.
+                    // inside (ScalarMemberInput et al.) can sit flush
+                    // against the cell's edges, instead of being inset
+                    // within it.
                     isEditing ? "p-0" : "px-2 py-2.5",
                     isLink && "cursor-pointer",
                     // Hints a cell is double-click-editable before the user
-                    // commits to it, matching Gel's own hover state — ring
-                    // (not border) so it draws inset, inside the existing
-                    // border-box, rather than shifting layout.
+                    // commits to it — a ring (not border) so it draws inset,
+                    // inside the existing border-box, rather than shifting
+                    // layout.
                     cellEditable && !isEditing && "cursor-text hover:ring-[1.5px] hover:ring-inset hover:ring-accent"
                   )}
                 >
@@ -865,10 +862,9 @@ const GutterCell: React.FC<GutterCellProps> = ({
 }) => {
   let content: React.ReactNode;
   if (linkEditMode) {
-    // A custom button in every state (never a native input) — matching
-    // Gel's own always-custom toggle (see dataInspector.module.scss's
-    // .selectLinkAction), and sidestepping a real bug a native
-    // radio/checkbox has here: clicking a *different* row's native radio
+    // A custom button in every state (never a native input) — sidestepping
+    // a real bug a native radio/checkbox has here: clicking a *different*
+    // row's native radio
     // fires that row's own onChange, but the previously-checked row's own
     // input never gets one (browsers only fire onChange for the input whose
     // own checked state actually changed via user interaction — the
@@ -877,8 +873,7 @@ const GutterCell: React.FC<GutterCellProps> = ({
     // visual state relied entirely on the checked prop taking effect — a
     // plain button re-rendered off the same linkChecked prop has no such
     // gap. Single-link (radio) renders fully rounded; multi-link (checkbox)
-    // renders a square with slightly rounded corners — same shape
-    // convention Gel uses.
+    // renders a square with slightly rounded corners.
     content = (
       <button
         type="button"

@@ -126,8 +126,8 @@ export const ScalarMemberInput: React.FC<ScalarMemberInputProps> = ({
     // it's squared off there instead; the roomier modal/panel surfaces keep
     // the rounding.
     dense ? "rounded-none" : "rounded-md",
-    // Dense mode fills the cell's full height edge-to-edge (matching Gel) —
-    // a native <input> already vertically centers its own text regardless of
+    // Dense mode fills the cell's full height edge-to-edge — a native
+    // <input> already vertically centers its own text regardless of
     // box height, but a <textarea> does *not* (it top-aligns), so vertical
     // padding is dropped in favor of a fixed line-height exactly matching the
     // available content height (ROW_HEIGHT minus the 1px border on each

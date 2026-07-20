@@ -9,7 +9,7 @@ interface SwitchProps {
   disabled?: boolean;
 }
 
-// Small on/off toggle (Gel-style global activation) — a thin styled wrapper
+// Small on/off toggle (per-global activation) — a thin styled wrapper
 // around radix-ui's Switch primitive, matching the app's accent color.
 export const Switch: React.FC<SwitchProps> = ({checked, onCheckedChange, title, disabled}) => (
   <RadixSwitch.Root

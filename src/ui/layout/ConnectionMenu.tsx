@@ -6,8 +6,7 @@ import {useLocation, useNavigate, useParams} from "react-router-dom";
 import {useConnections} from "@/lib/api/useConnections";
 
 // Connection ("branch") switcher — lists every configured connection and
-// navigates to the same tab under the newly selected one, matching Gel's
-// breadcrumb database dropdown.
+// navigates to the same tab under the newly selected one.
 export const ConnectionMenu: React.FC = () => {
   const {branch} = useParams();
   const location = useLocation();

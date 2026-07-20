@@ -39,9 +39,9 @@ const safeParseJson = (raw: string): unknown => {
 };
 
 // Embedded (no popover, always visible) tuple param editor — the query
-// editor's params panel is itself always-visible, matching gel-ui's own
-// param panel, so a tuple param renders its TupleEditor inline rather than
-// behind a click-to-open popover like the Data Explorer's grid cells.
+// editor's params panel is itself always-visible, so a tuple param renders
+// its TupleEditor inline rather than behind a click-to-open popover like
+// the Data Explorer's grid cells.
 const TupleParamEditor: React.FC<{
   name: string;
   members: NamedTupleMember[];
@@ -73,13 +73,13 @@ const ArrayParamEditor: React.FC<{
   );
 };
 
-// One labeled input per $name parameter detected in the query text, styled
-// after Gel's own param inputs — a floating cast-type tag in the input's top
-// right corner, which turns red (along with the input's border) once the
-// value is invalid, or the field is required and still empty. Enum-cast
-// params get a Select of the enum's members instead of free text, matching
-// Gel — clearable when the param is optional, so it can be reset to unset.
-// Only rendered when the query actually has parameters.
+// One labeled input per $name parameter detected in the query text — a
+// floating cast-type tag in the input's top right corner, which turns red
+// (along with the input's border) once the value is invalid, or the field
+// is required and still empty. Enum-cast params get a Select of the enum's
+// members instead of free text — clearable when the param is optional, so
+// it can be reset to unset. Only rendered when the query actually has
+// parameters.
 export const ParamsPanel: React.FC<ParamsPanelProps> = ({params, values, errors, schema, onChange, resetKey = 0}) => {
   if (params.length === 0) return null;
 

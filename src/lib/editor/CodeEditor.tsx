@@ -40,10 +40,10 @@ export interface CodeEditorProps {
   ref?: React.Ref<CodeEditorHandle>;
 }
 
-// PyQL-aware CodeMirror editor, trimmed down from gel-ui's codeEditor package
-// for Phase 1 (REPL only) — no schema-aware completions, error/warning
-// underlines, or query-plan ("explain") decorations yet; those belong to the
-// Query Editor phase, once schema data and query diagnostics exist to feed it.
+// PyQL-aware CodeMirror editor — Phase 1 (REPL only): no schema-aware
+// completions, error/warning underlines, or query-plan ("explain")
+// decorations yet; those belong to the Query Editor phase, once schema
+// data and query diagnostics exist to feed it.
 // App-level shortcuts (e.g. "run query") are handled outside via
 // react-hotkeys-hook rather than CodeMirror's own keymap — sidesteps CM6's
 // keymap precedence rules entirely instead of fighting them.

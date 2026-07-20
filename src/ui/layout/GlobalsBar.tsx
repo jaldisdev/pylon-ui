@@ -10,7 +10,7 @@ const formatValue = (value: unknown) => (typeof value === "string" ? `'${value}'
 // when none are set (no "no globals" placeholder), appearing once the
 // globals modal (gear icon in TopBar) has at least one value saved. Each
 // pill has a hover-revealed reset button so clearing one global doesn't
-// require reopening the modal, plus an activation toggle (Gel-style) — a
+// require reopening the modal, plus a per-global activation toggle — a
 // disabled global stays visible/stored but dims and is excluded from the
 // next query's `globals` body (see client.ts's runQuery).
 export const GlobalsBar: React.FC = () => {

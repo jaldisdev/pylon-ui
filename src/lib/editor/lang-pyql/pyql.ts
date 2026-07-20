@@ -7,11 +7,10 @@ import {parser as _parser} from "./lang";
 
 const parser = _parser as LRParser;
 
-// PyQL is nearly identical to EdgeQL syntactically, so this grammar/keyword
-// list is adapted from gel-ui's `lang-edgeql` package (its grammar is mostly
-// syntax-generic — identifiers, strings, casts, $params, module::name — with
-// EdgeQL-specific keywords isolated in meta.js). Keywords can be trimmed or
-// extended as real PyQL/EdgeQL differences are discovered.
+// This grammar is mostly syntax-generic — identifiers, strings, casts,
+// $params, module::name — with PyQL-specific keywords isolated in meta.js.
+// Keywords can be trimmed or extended as real PyQL syntax differences are
+// discovered.
 export const pyqlLanguage = LRLanguage.define({
   parser: parser.configure({
     props: [

@@ -8,10 +8,9 @@ import {ScalarMemberInput} from "@/ui/dataEditor/ScalarMemberInput";
 // Recursive editor for a named-tuple value (nominal `@pylon.named_tuple` or
 // structural `pylon.Tuple[...]`) — one row per member, `name := <widget>`
 // (no label for a positional/unnamed element), recursing into another
-// TupleEditor for a nested tuple member. Mirrors gel-ui's TupleEditor:
-// alternating panel shading by depth, one `onChange` for the whole assembled
-// value (no per-member commit — the whole tuple commits atomically when its
-// popover closes).
+// TupleEditor for a nested tuple member: alternating panel shading by depth,
+// one `onChange` for the whole assembled value (no per-member commit — the
+// whole tuple commits atomically when its popover closes).
 interface TupleEditorProps {
   members: NamedTupleMember[];
   schema: SchemaResponse;

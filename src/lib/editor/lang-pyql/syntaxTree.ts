@@ -1,7 +1,6 @@
 import type {SyntaxNode} from "@lezer/common";
 
-// Generic Lezer tree-walking helpers (nothing PyQL-specific), copied from
-// gel-ui's shared/studio/utils/syntaxTree.ts.
+// Generic Lezer tree-walking helpers (nothing PyQL-specific).
 
 export const getNodeText = (query: string, node: SyntaxNode): string => query.slice(node.from, node.to);
 

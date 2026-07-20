@@ -20,7 +20,7 @@ const SIDE_CLASSES: Record<NonNullable<TooltipProps["side"]>, Record<NonNullable
 
 // Hover-triggered label (CSS-only, no positioning library) — colors are
 // inverted vs. the page theme so it reads clearly in both light and dark
-// mode, matching gel-ui's sidebar/icon tooltips.
+// mode.
 export const Tooltip: React.FC<TooltipProps> = ({label, side = "bottom", align = "center", children}) => (
   <span className="group/tooltip relative inline-flex">
     {children}

@@ -3,8 +3,8 @@ import type React from "react";
 import {LOGO_LINES, modKey} from "@/features/repl/banner";
 
 // Welcome banner shown once above the scrollback — the Pylon ASCII logo
-// (reused from the CLI's own banner) plus the same welcome/shortcuts copy
-// Gel's REPL shows, adapted to our own commands (\help/\clear) and hotkeys.
+// (reused from the CLI's own banner) plus welcome/shortcuts copy for our
+// own commands (\help/\clear) and hotkeys.
 export const ReplHeader: React.FC<{onRunHelp: () => void; onClear: () => void}> = ({onRunHelp, onClear}) => (
   <div className="p-3 text-sm">
     <pre className="font-mono text-[11px] leading-tight whitespace-pre text-accent">{LOGO_LINES}</pre>

@@ -18,8 +18,8 @@ export const Layout: React.FC = () => {
   const isMobile = useIsMobile();
   const {branch} = useParams();
   // Fetched once here so it's warm in the TanStack Query cache by the time
-  // any tab (JsonTree, future Data Explorer) needs it — same "load schema on
-  // connect" idea as Gel's UI.
+  // any tab (JsonTree, future Data Explorer) needs it — loaded once on
+  // connect, not refetched per tab.
   useSchema();
   const {data: connections} = useConnections();
 
@@ -35,8 +35,8 @@ export const Layout: React.FC = () => {
   }, [connections?.project, branch]);
 
   // Output — Sidebar spans the full height directly below TopBar; GlobalsBar
-  // sits in the content column so it's indented to the same level as `main`,
-  // matching Gel's layout (not full-bleed above the sidebar).
+  // sits in the content column so it's indented to the same level as `main`
+  // (not full-bleed above the sidebar).
   return (
     <div className="flex h-dvh flex-col bg-bg text-fg">
       <TopBar />

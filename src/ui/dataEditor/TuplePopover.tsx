@@ -20,11 +20,8 @@ interface TuplePopoverProps {
 }
 
 // Floating popover wrapper around TupleEditor, anchored to the grid cell
-// being edited. gel-ui's own "popover" is just CSS overflow on an absolutely
-// positioned custom grid cell — that trick doesn't transfer to this app's
-// real HTML <table>-based grid, so this uses an actual floating popover
-// instead. Commit is atomic for the whole tuple, on close: click-outside or
-// Ctrl/Cmd+Enter commits, Escape discards — matching gel-ui and this app's
+// being edited. Commit is atomic for the whole tuple, on close: click-
+// outside or Ctrl/Cmd+Enter commits, Escape discards — matching this app's
 // existing top-level cell editors.
 export const TuplePopover: React.FC<TuplePopoverProps> = ({members, schema, initialValue, onCommit, onDiscard, optional}) => {
   const [draft, setDraft] = useState<unknown>(() =>
@@ -70,8 +67,7 @@ export const TuplePopover: React.FC<TuplePopoverProps> = ({members, schema, init
           align="start"
           // Shifts the popover up by the grid row's own height (see
           // DataGrid.tsx's ROW_HEIGHT) so it overlays the cell from its top
-          // edge instead of floating below a now-blank collapsed cell —
-          // matching Gel's own tuple/array editor placement.
+          // edge instead of floating below a now-blank collapsed cell.
           sideOffset={-42}
           onEscapeKeyDown={discard}
           onPointerDownOutside={commit}

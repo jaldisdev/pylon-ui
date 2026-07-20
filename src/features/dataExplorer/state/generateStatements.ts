@@ -2,17 +2,16 @@ import type {NamedTupleMember, SchemaPointer, SchemaResponse, SchemaType} from "
 import {pointerTypeTag, UUID_TYPE_TAG, type PointerTypeTag} from "@/lib/schema/typeTags";
 import type {DeleteObjectEdit, EditValue, InsertObjectEdit, UpdateLinkEdit, UpdatePropertyEdit} from "./editsStore";
 
-// Ports gel-ui's generateStatements() (shared/studio/tabs/dataview/state/edits.ts)
-// to PyQL: groups pending edits by object, emits one insert/update/delete
-// statement per affected object, topologically sorts inserts so a same-batch
-// forward reference (e.g. a new Post linking a new Tag) is ordered after its
-// dependency, and wraps everything as a single `with ... select {...}` query
-// — one atomic round trip via the existing /api/query endpoint.
+// Turns pending Data Explorer edits into PyQL: groups pending edits by
+// object, emits one insert/update/delete statement per affected object,
+// topologically sorts inserts so a same-batch forward reference (e.g. a new
+// Post linking a new Tag) is ordered after its dependency, and wraps
+// everything as a single `with ... select {...}` query — one atomic round
+// trip via the existing /api/query endpoint.
 //
-// Two deliberate deviations from gel-ui's literal EdgeQL, both because PyQL's
-// compiler currently rejects the exact syntax gel-ui uses (confirmed compiler
-// gaps against the "PyQL ≡ EdgeQL" contract, not permanent constraints — see
-// the plan file):
+// Two deliberate constraints on the generated syntax, both because PyQL's
+// compiler currently rejects the alternatives (confirmed compiler gaps, not
+// permanent constraints — see the plan file):
 //   1. No `assert_exists(...)` wrapper — it can't wrap insert/update/delete
 //      today. A policy-filtered write would silently no-op instead of
 //      erroring, but Pylon has no access-policy feature yet, so this has no
@@ -251,7 +250,7 @@ const insertDependencies = (insertId: number, linkEditsByObjectId: Map<string | 
 // linked from a new Post) is emitted before whatever references it — plain
 // `with` bindings compile to Postgres CTEs, which can't forward-reference a
 // later-defined one. Throws on a cycle (surfaced as a top-level error, not a
-// per-statement one, matching gel-ui).
+// per-statement one).
 const topoSortInserts = (
   insertList: InsertObjectEdit[],
   linkEditsByObjectId: Map<string | number, UpdateLinkEdit[]>

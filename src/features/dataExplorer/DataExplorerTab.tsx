@@ -57,7 +57,7 @@ export const DataExplorerTab: React.FC = () => {
       );
     }
     // No type in the URL at all — redirect to the first available
-    // (non-junction) type, mirroring gel-ui's own auto-redirect behavior.
+    // (non-junction) type.
     const first = schema.types.find((t) => !t.junction);
     return first ? (
       <Navigate to={`${basePath}/${first.module}::${first.name}`} replace />

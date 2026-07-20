@@ -7,7 +7,7 @@ interface CardProps {
 }
 
 // Rounded, shadowed content card — every tab's root sits inside one of these.
-// Matches gel-ui's shell: chrome (top bar, nav) carries no borders at all,
+// The shell's own chrome (top bar, nav) carries no borders at all —
 // separation comes from this card's shadow against the page background
 // instead. Full-bleed (no radius) below the md breakpoint, matching mobile.
 export const Card: React.FC<CardProps> = ({children, className}) => (

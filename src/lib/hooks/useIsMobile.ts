@@ -3,7 +3,7 @@ import {useEffect, useState} from "react";
 const MOBILE_QUERY = "(max-width: 767.5px)";
 
 // Tracks whether the viewport is narrow enough to switch from the sidebar
-// nav to the mobile bottom tab bar. Mirrors gel-ui's useMobile hook.
+// nav to the mobile bottom tab bar.
 export const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(
     () => window.matchMedia(MOBILE_QUERY).matches

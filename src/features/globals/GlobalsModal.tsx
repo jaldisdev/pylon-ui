@@ -73,8 +73,8 @@ const BOOL_OPTIONS: SelectOption[] = [
 // Configures session globals (Global[T] declarations, e.g. current_user_id)
 // and session config options (Client.with_config(), e.g.
 // allow_user_specified_id) — a scope toggle switches which one this modal
-// edits, matching Gel's own separate globals/config panels merged into one
-// place here. Both share the same activation-toggle + merge-on-save pattern
+// edits, merging what would otherwise be two separate globals/config panels
+// into one place here. Both share the same activation-toggle + merge-on-save pattern
 // (see globalsStore.ts/configStore.ts) — only the value editor differs: a
 // tuple/array/enum/scalar global gets the same widgets as everywhere else in
 // the app (TupleEditor/ArrayEditor/ScalarMemberInput), while a boolean config
@@ -91,9 +91,9 @@ export const GlobalsModal: React.FC<GlobalsModalProps> = ({onClose}) => {
   const setConfigEntry = useConfigStore((s) => s.setEntry);
 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  // Per-global on/off toggle, like Gel's globals panel — a global's value
-  // always stays stored client-side (see globalsStore.ts), but only an
-  // enabled one is actually sent with a query.
+  // Per-global on/off toggle — a global's value always stays stored
+  // client-side (see globalsStore.ts), but only an enabled one is actually
+  // sent with a query.
   const [draftEnabled, setDraftEnabled] = useState<Record<string, boolean>>({});
   // Same shape as the globals drafts above, keyed by config option name
   // instead of "module::name" — seeded from the option's own registry

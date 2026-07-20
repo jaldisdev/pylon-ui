@@ -14,10 +14,10 @@ interface ConfirmButtonProps {
 
 // A first click "arms" the button (label swaps to a confirmation prompt, a
 // few seconds to change your mind); a second click within that window
-// actually fires. Matches gel-ui's own ConfirmButton, used for its Review
-// Changes modal's "Clear all changes" — a lighter-weight guard than a
-// separate confirm dialog for an action that's still fully reversible up
-// until it fires (discarding in-memory pending edits, not a server call).
+// actually fires. Used by the Review Changes modal's "Clear all changes" —
+// a lighter-weight guard than a separate confirm dialog for an action
+// that's still fully reversible up until it fires (discarding in-memory
+// pending edits, not a server call).
 export const ConfirmButton: React.FC<ConfirmButtonProps> = ({
   label,
   confirmLabel = "Click again to confirm",

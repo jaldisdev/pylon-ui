@@ -13,7 +13,7 @@ interface ReplEntryProps {
   showDateHeader: boolean;
 }
 
-// Gel truncates by *rendered line count* (16 lines), not top-level item
+// Truncates by *rendered line count* (16 lines), not top-level item
 // count — a handful of wide objects can blow past that just as easily as
 // many narrow ones. Approximated here per top-level item: 1 line for the
 // opening brace, 1 for the closing brace, plus 1 per field (nested values
@@ -39,11 +39,9 @@ const countVisible = (objects: unknown[]): number => {
   return count;
 };
 
-// One query/result pair, styled as its own bordered card — confirmed from
-// gel-ui's repl.module.scss: .replHistoryItem (bg Grey95, 1px Grey90 border,
-// 8px radius) wraps a .historyHeader strip (lighter header_background,
-// rounded top corners only) holding the `branch[pyql]> query` prompt line,
-// with the result/error/help output below it inside the same card.
+// One query/result pair, styled as its own bordered card: a lighter header
+// strip (rounded top corners only) holding the `branch[pyql]> query` prompt
+// line, with the result/error/help output below it inside the same card.
 export const ReplEntry: React.FC<ReplEntryProps> = ({entry, branch, showDateHeader}) => {
   const [showAll, setShowAll] = useState(false);
 

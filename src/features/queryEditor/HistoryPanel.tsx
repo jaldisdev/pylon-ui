@@ -10,8 +10,8 @@ export interface HistoryEntry {
   timestamp: number;
   objectCount: number | null; // null means the run errored — shown in the list preview
   // Cached so selecting a past entry restores the exact same state (params,
-  // result, error) instantly, matching Gel — not just the query text, which
-  // would otherwise need a re-run against a possibly-since-changed database.
+  // result, error) instantly — not just the query text, which would
+  // otherwise need a re-run against a possibly-since-changed database.
   paramValues: Record<string, string>;
   // `shape` is optional — entries persisted before it was added won't have
   // it; JsonTree falls back to a pointer-name-based guess when it's absent.
@@ -27,8 +27,8 @@ interface HistoryPanelProps {
 }
 
 // Slide-in side panel listing past queries, persisted to localStorage (see
-// useLocalStorageState in QueryEditorTab) so it survives a page reload,
-// matching Gel's UI. Capped at a few hundred entries, so no virtualization.
+// useLocalStorageState in QueryEditorTab) so it survives a page reload.
+// Capped at a few hundred entries, so no virtualization.
 export const HistoryPanel: React.FC<HistoryPanelProps> = ({entries, open, onClose, onSelect}) => {
   if (!open) return null;
 
