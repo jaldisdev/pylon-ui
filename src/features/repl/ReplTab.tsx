@@ -11,6 +11,7 @@ import {CodeEditor, type CodeEditorHandle} from "@/lib/editor/CodeEditor";
 import {useLocalStorageState} from "@/lib/hooks/useLocalStorageState";
 import {useTheme} from "@/lib/theme/useTheme";
 import {Card} from "@/ui/Card";
+import {formatAnalyzeResult} from "@/features/repl/analyzeFormat";
 import {ReplEntry} from "@/features/repl/ReplEntry";
 import {ReplHeader} from "@/features/repl/ReplHeader";
 
@@ -29,7 +30,15 @@ export interface HistoryEntry {
   floatMarkers?: FloatMarkerTree;
   error?: QueryErrorInfo;
   isHelp?: boolean; // \help output — rendered as static text, not a query result
+  // Pre-formatted `analyze <query>` text (see analyzeFormat.ts) — rendered
+  // verbatim in a <pre>, the same way isHelp's static banner text is.
+  analyze?: string;
 }
+
+// Soft keyword, same convention as pylon-core's own parser (see
+// parse/parser.rs's at_analyze_keyword) — only recognized as the leading
+// token, "analyze" stays a legal identifier everywhere else.
+const ANALYZE_PREFIX_RE = /^\s*analyze\b/i;
 
 const sameDay = (a: number, b: number) => new Date(a).toDateString() === new Date(b).toDateString();
 
@@ -61,8 +70,14 @@ export const ReplTab: React.FC = () => {
     editorRef.current?.focus();
   }, []);
 
+  // A discriminated union, not two separate mutations — runCurrentQuery
+  // needs a single in-flight/error state regardless of which kind of query
+  // was submitted.
   const mutation = useMutation({
-    mutationFn: (pyql: string) => api.runQuery(pyql),
+    mutationFn: async (pyql: string) =>
+      ANALYZE_PREFIX_RE.test(pyql)
+        ? ({kind: "analyze", data: await api.analyzeQuery(pyql)} as const)
+        : ({kind: "rows", data: await api.runQuery(pyql)} as const),
   });
 
   const runHelp = () => {
@@ -88,18 +103,26 @@ export const ReplTab: React.FC = () => {
     }
 
     mutation.mutate(text, {
-      onSuccess: (data) => {
+      onSuccess: (result) => {
         setHistory((h) => [
           ...h,
-          {
-            id: h.length,
-            pyql: text,
-            timestamp: Date.now(),
-            objects: data.objects,
-            durationMs: data.duration_ms,
-            shape: data.shape,
-            floatMarkers: data.floatMarkers,
-          },
+          result.kind === "analyze"
+            ? {
+                id: h.length,
+                pyql: text,
+                timestamp: Date.now(),
+                analyze: formatAnalyzeResult(text, result.data.coarse_grained),
+                durationMs: result.data.duration_ms,
+              }
+            : {
+                id: h.length,
+                pyql: text,
+                timestamp: Date.now(),
+                objects: result.data.objects,
+                durationMs: result.data.duration_ms,
+                shape: result.data.shape,
+                floatMarkers: result.data.floatMarkers,
+              },
         ]);
       },
       onError: (err) => {

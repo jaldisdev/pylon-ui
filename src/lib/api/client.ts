@@ -243,6 +243,60 @@ export interface StatsResponse {
   types: number;
 }
 
+// Cost/timing figures for one CoarseGrainedNode — lifted verbatim from
+// whichever Postgres EXPLAIN plan node is the top of that shape path's own
+// subtree (see pylon-core's analyze.rs::PlanCost). actual_* fields are only
+// null if EXPLAIN somehow ran without ANALYZE, which analyze_compiled never
+// does — kept optional here defensively, not because it's expected.
+export interface PlanCost {
+  startup_cost: number;
+  total_cost: number;
+  plan_rows: number;
+  plan_width: number;
+  actual_startup_time: number | null;
+  actual_total_time: number | null;
+  actual_rows: number | null;
+  actual_loops: number | null;
+}
+
+// One node of the `analyze <query>` coarse-grained tree — see pylon-core's
+// analyze.rs::CoarseGrainedNode, which this mirrors field-for-field.
+export interface CoarseGrainedNode {
+  // Dotted shape path: "root", "root.villains", "root.villains.nemesis", ...
+  path: string;
+  // Byte offset into the *original* query text (the same string passed to
+  // api.analyzeQuery) to plant this path's marker at — null when the
+  // originating shape element carried none (e.g. an implicit `{ id }`).
+  marker_offset: number | null;
+  // Relation names touched by this path's own plan nodes — a junction-
+  // backed link's own path lists both the junction table and the target
+  // table together (see analyze.rs's resolve_subtree_path doc comment).
+  relations: string[];
+  cost: PlanCost;
+  children: {name: string; node: CoarseGrainedNode}[];
+}
+
+export interface AnalyzeResponse {
+  coarse_grained: CoarseGrainedNode;
+  duration_ms: number;
+}
+
+// Shared by runQuery/analyzeQuery — session globals/config apply to every
+// query automatically; only toggled-on entries are sent, matching
+// runQuery's existing (pre-existing) behavior exactly.
+const sessionExtras = () => ({
+  globals: Object.fromEntries(
+    Object.entries(useGlobalsStore.getState().entries)
+      .filter(([, entry]) => entry.enabled)
+      .map(([key, entry]) => [key, entry.value])
+  ),
+  config: Object.fromEntries(
+    Object.entries(useConfigStore.getState().entries)
+      .filter(([, entry]) => entry.enabled)
+      .map(([key, entry]) => [key, entry.value])
+  ),
+});
+
 export const api = {
   getSchema: () => request<SchemaResponse>("/schema"),
   getConnections: () => request<ConnectionsResponse>("/connections"),
@@ -253,24 +307,17 @@ export const api = {
   runQuery: (pyql: string, params?: Record<string, unknown>, signal?: AbortSignal) =>
     fetchQueryResponse(`/${currentConnection()}/query`, {
       method: "POST",
-      // Session globals (configured via the top bar's globals modal) apply
-      // to every query automatically — callers never need to pass them. Only
-      // toggled-on globals/config options are sent; a disabled one stays
-      // stored client-side but is excluded here.
-      body: JSON.stringify({
-        pyql,
-        params,
-        globals: Object.fromEntries(
-          Object.entries(useGlobalsStore.getState().entries)
-            .filter(([, entry]) => entry.enabled)
-            .map(([key, entry]) => [key, entry.value])
-        ),
-        config: Object.fromEntries(
-          Object.entries(useConfigStore.getState().entries)
-            .filter(([, entry]) => entry.enabled)
-            .map(([key, entry]) => [key, entry.value])
-        ),
-      }),
+      body: JSON.stringify({pyql, params, ...sessionExtras()}),
+      signal,
+    }),
+  // `pyql` doesn't need a leading "analyze" keyword already written — the
+  // backend (Client.analyze()) adds it automatically if missing, mirroring
+  // how ReplTab/QueryEditorTab detect the prefix only to decide *which*
+  // api.* method to call, not to transform the text itself.
+  analyzeQuery: (pyql: string, params?: Record<string, unknown>, signal?: AbortSignal) =>
+    connectionRequest<AnalyzeResponse>("/analyze", {
+      method: "POST",
+      body: JSON.stringify({pyql, params, ...sessionExtras()}),
       signal,
     }),
   runAiChat: (body: AiChatRequest, signal?: AbortSignal) =>

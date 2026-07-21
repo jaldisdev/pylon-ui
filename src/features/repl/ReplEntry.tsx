@@ -69,6 +69,8 @@ export const ReplEntry: React.FC<ReplEntryProps> = ({entry, branch, showDateHead
             <pre className="font-mono text-sm whitespace-pre-wrap text-fg-muted">{HELP_TEXT}</pre>
           ) : entry.error ? (
             <QueryErrorView error={entry.error} />
+          ) : entry.analyze !== undefined ? (
+            <pre className="overflow-x-auto font-mono text-sm whitespace-pre text-fg">{entry.analyze}</pre>
           ) : (
             <>
               {/* A ::after overlay, absolutely positioned over the bottom of
