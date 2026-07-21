@@ -622,6 +622,13 @@ export const DataGrid: React.FC<DataGridProps> = ({
               const hasEdit = editValue !== undefined;
               const isInvalid = hasEdit && !editValue.valid;
               const displayValue = hasEdit ? (editValue.valid ? editValue.value : editValue.raw) : rawFetchedValue;
+              // A new row's required-with-no-default property has nothing to
+              // show yet but "{}" — same as an optional one at rest — so
+              // without its own highlight there's no way to tell it still
+              // needs a value before commit can succeed (matches
+              // generateStatements.ts's own missing-required-property check).
+              const isMissingRequired =
+                isInsertRow && !isLink && !hasEdit && pointer.required && !pointer.hasDefault && pointer.name !== "id";
 
               return (
                 <div
@@ -655,7 +662,8 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     // commits to it — a ring (not border) so it draws inset,
                     // inside the existing border-box, rather than shifting
                     // layout.
-                    cellEditable && !isEditing && "cursor-text hover:ring-[1.5px] hover:ring-inset hover:ring-accent"
+                    cellEditable && !isEditing && "cursor-text hover:ring-[1.5px] hover:ring-inset hover:ring-accent",
+                    isMissingRequired && !isEditing && "border-l-2 border-l-red-500 bg-red-500/10"
                   )}
                 >
                   {isEditing ? (

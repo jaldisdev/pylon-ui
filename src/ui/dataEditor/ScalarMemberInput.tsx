@@ -119,7 +119,7 @@ export const ScalarMemberInput: React.FC<ScalarMemberInputProps> = ({
   const error = externalError ?? internalError;
   const showTag = castType && !dense;
   const inputClassName = clsx(
-    "w-full border-[1.5px] bg-surface font-mono text-fg outline-none disabled:opacity-50",
+    "w-full font-mono text-fg outline-none disabled:opacity-50",
     // Dense (grid-cell) mode now sits flush against the cell's own edges
     // (see DataGrid.tsx's `isEditing ? "p-0" : ...`) — a rounded corner
     // butted against a square cell boundary looks like a clipped corner, so
@@ -137,7 +137,20 @@ export const ScalarMemberInput: React.FC<ScalarMemberInputProps> = ({
     // it at ROW_HEIGHT regardless.
     dense ? "h-full px-2 text-sm leading-[2.5rem]" : "h-10 px-2.5 text-sm",
     showTag && "pr-14",
-    error ? "border-(--syntax-operator)" : "border-border focus:border-accent"
+    // Dense mode matches the grid's own left-border-plus-tint treatment for
+    // an error state (see DataGrid.tsx's isMissingRequired) instead of a
+    // boxed all-around red border — the roomier modal/panel surfaces keep
+    // the classic all-around border either way, resting or errored. The
+    // dense+error branch still needs its own border-border (not just
+    // border-l-red-500) on the other three sides, or they fall back to the
+    // browser's default border-color (currentColor) instead of staying
+    // invisible/subtle — and bg-surface has to be dropped from this branch
+    // entirely (not just "overridden" by bg-red-500/10 after it) since two
+    // same-specificity background-color utilities race on generation order,
+    // not on their position in the class string.
+    dense && error
+      ? "border-[1.5px] border-border border-l-2 border-l-red-500 bg-red-500/10"
+      : clsx("border-[1.5px] bg-surface", error ? "border-(--syntax-operator)" : "border-border focus:border-accent")
   );
 
   const commit = (next: string) => {

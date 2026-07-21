@@ -37,13 +37,22 @@ export const LinkPropertyCell: React.FC<LinkPropertyCellProps> = ({pointer, sche
   const castType = pointer.typeName ?? null;
   const currentValue = value === undefined ? null : value.valid ? value.value : value.raw;
 
+  // Empty here means "never touched this session" (value undefined) or
+  // "touched but cleared back to nothing" — either way, a required property
+  // with no default needs a value before commit can succeed (matches
+  // generateStatements.ts's own missing-required-link-property check), so
+  // this needs its own flagging: ScalarMemberInput's internal validation
+  // only catches a malformed *typed* value, not "required and still blank".
+  const isEmpty = value === undefined || (value.valid && (value.value === null || value.value === undefined || value.value === ""));
+  const requiredEmptyError = pointer.required && !pointer.hasDefault && isEmpty ? "Required" : null;
+
   return (
     <ScalarMemberInput
       dense
       value={currentValue}
       castType={castType}
       enumOptions={enumOptions}
-      error={value && !value.valid ? value.error : null}
+      error={value && !value.valid ? value.error : requiredEmptyError}
       onChange={(raw, coerced, valid) =>
         onChange(valid ? {valid: true, value: coerced} : {valid: false, raw, error: validateCastValue(raw, castType) ?? ""})
       }
