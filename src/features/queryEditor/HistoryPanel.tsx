@@ -2,20 +2,22 @@ import type React from "react";
 import clsx from "clsx";
 import {X} from "lucide-react";
 
-import type {QueryErrorInfo, ValueShapeTag} from "@/lib/api/client";
+import type {QueryErrorInfo} from "@/lib/api/client";
+import type {QueryResult} from "@/features/queryEditor/ResultPanel";
 
 export interface HistoryEntry {
   id: string;
   pyql: string;
   timestamp: number;
-  objectCount: number | null; // null means the run errored — shown in the list preview
+  // null for an errored run *or* an analyze run (no "objects" to count) —
+  // the preview line below derives which from entry.error/entry.result.kind
+  // directly rather than overloading this field further.
+  objectCount: number | null;
   // Cached so selecting a past entry restores the exact same state (params,
   // result, error) instantly — not just the query text, which would
   // otherwise need a re-run against a possibly-since-changed database.
   paramValues: Record<string, string>;
-  // `shape` is optional — entries persisted before it was added won't have
-  // it; JsonTree falls back to a pointer-name-based guess when it's absent.
-  result: {objects: unknown[]; durationMs: number; shape?: ValueShapeTag} | null;
+  result: QueryResult | null;
   error: QueryErrorInfo | null;
 }
 
@@ -57,15 +59,12 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({entries, open, onClos
               className="block w-full border-b border-border px-2 py-1.5 text-left hover:bg-surface-hover"
             >
               <div className="truncate font-mono text-xs text-fg">{entry.pyql}</div>
-              <div
-                className={clsx(
-                  "mt-0.5 text-2xs",
-                  entry.objectCount === null ? "text-red-500" : "text-fg-muted"
-                )}
-              >
-                {entry.objectCount === null
+              <div className={clsx("mt-0.5 text-2xs", entry.error ? "text-red-500" : "text-fg-muted")}>
+                {entry.error
                   ? "error"
-                  : `${entry.objectCount} object${entry.objectCount === 1 ? "" : "s"}`}
+                  : entry.result?.kind === "analyze"
+                    ? "analyze"
+                    : `${entry.objectCount} object${entry.objectCount === 1 ? "" : "s"}`}
                 {" · "}
                 {new Date(entry.timestamp).toLocaleTimeString()}
               </div>

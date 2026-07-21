@@ -86,11 +86,17 @@ export const QueryEditorTab: React.FC = () => {
   const isOutdated = result !== null && lastRunQueryText !== null && queryText !== lastRunQueryText;
   const canRun = queryText.trim().length > 0 && !hasParamErrors;
 
+  // A discriminated union, not two separate mutations — runQuery needs a
+  // single in-flight/error state regardless of which kind of query was
+  // submitted. Same soft-keyword convention as pylon-core's own parser and
+  // the REPL's ANALYZE_PREFIX_RE.
   const mutation = useMutation({
-    mutationFn: ({pyql, paramsDict}: {pyql: string; paramsDict?: Record<string, unknown>}) => {
+    mutationFn: async ({pyql, paramsDict}: {pyql: string; paramsDict?: Record<string, unknown>}) => {
       const controller = new AbortController();
       abortControllerRef.current = controller;
-      return api.runQuery(pyql, paramsDict, controller.signal);
+      return /^\s*analyze\b/i.test(pyql)
+        ? ({kind: "analyze", data: await api.analyzeQuery(pyql, paramsDict, controller.signal)} as const)
+        : ({kind: "rows", data: await api.runQuery(pyql, paramsDict, controller.signal)} as const);
     },
   });
 
@@ -128,13 +134,17 @@ export const QueryEditorTab: React.FC = () => {
     mutation.mutate(
       {pyql, paramsDict},
       {
-        onSuccess: (data) => {
-          const result = {
-            objects: data.objects,
-            durationMs: data.duration_ms,
-            shape: data.shape,
-            floatMarkers: data.floatMarkers,
-          };
+        onSuccess: (outcome) => {
+          const result: QueryResult =
+            outcome.kind === "analyze"
+              ? {kind: "analyze", coarseGrained: outcome.data.coarse_grained, durationMs: outcome.data.duration_ms}
+              : {
+                  kind: "rows",
+                  objects: outcome.data.objects,
+                  durationMs: outcome.data.duration_ms,
+                  shape: outcome.data.shape,
+                  floatMarkers: outcome.data.floatMarkers,
+                };
           setResult(result);
           setError(null);
           setLastRunQueryText(pyql);
@@ -145,7 +155,7 @@ export const QueryEditorTab: React.FC = () => {
                 id: crypto.randomUUID(),
                 pyql,
                 timestamp: Date.now(),
-                objectCount: data.objects.length,
+                objectCount: outcome.kind === "rows" ? outcome.data.objects.length : null,
                 paramValues: {...paramValues},
                 result,
                 error: null,

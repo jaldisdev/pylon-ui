@@ -1,12 +1,14 @@
 import type React from "react";
 import {Loader2} from "lucide-react";
 
-import type {QueryErrorInfo, ValueShapeTag} from "@/lib/api/client";
+import type {CoarseGrainedNode, QueryErrorInfo, ValueShapeTag} from "@/lib/api/client";
 import type {FloatMarkerTree} from "@/lib/api/floatMarkers";
+import {AnalyzeView} from "@/features/queryEditor/AnalyzeView";
 import {JsonTree} from "@/ui/JsonTree";
 import {QueryErrorView} from "@/ui/QueryErrorView";
 
-export interface QueryResult {
+export interface RowsQueryResult {
+  kind: "rows";
   objects: unknown[];
   durationMs: number;
   // Optional — a result restored from a history entry persisted before this
@@ -16,6 +18,14 @@ export interface QueryResult {
   // Same "persisted before this field existed" caveat as shape above.
   floatMarkers?: FloatMarkerTree;
 }
+
+export interface AnalyzeQueryResult {
+  kind: "analyze";
+  coarseGrained: CoarseGrainedNode;
+  durationMs: number;
+}
+
+export type QueryResult = RowsQueryResult | AnalyzeQueryResult;
 
 interface ResultPanelProps {
   isRunning: boolean;
@@ -41,6 +51,19 @@ export const ResultPanel: React.FC<ResultPanelProps> = ({isRunning, result, erro
 
   if (!result) {
     return <div className="flex h-full items-center justify-center text-sm text-fg-muted">No result yet</div>;
+  }
+
+  if (result.kind === "analyze") {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex-1 overflow-auto">
+          <AnalyzeView root={result.coarseGrained} />
+        </div>
+        <div className="flex h-7 shrink-0 select-none items-center justify-center bg-surface text-2xs text-fg-muted">
+          {result.durationMs.toFixed(1)}ms
+        </div>
+      </div>
+    );
   }
 
   // Output — the row count/duration is a sticky footer (like a Finder status
