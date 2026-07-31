@@ -51,6 +51,20 @@ export const QueryEditorTab: React.FC = () => {
   const [orientation, setOrientation] = useState<Orientation>("horizontal");
   const [paramsResetKey, setParamsResetKey] = useState(0);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // null means "not previewing a history entry" — while the panel is open,
+  // that specifically means "previewing the draft" (see HistoryPanel's own
+  // previewedId doc comment, ported from gel-ui's historyCursor === -1).
+  const [historyPreviewId, setHistoryPreviewId] = useState<string | null>(null);
+  // Snapshot of the live editor/result state taken the moment the history
+  // panel opens, restored by Cancel — so browsing past entries as a preview
+  // never loses whatever you were in the middle of before opening it.
+  const historyDraftRef = useRef<{
+    queryText: string;
+    paramValues: Record<string, string>;
+    result: QueryResult | null;
+    error: QueryErrorInfo | null;
+    lastRunQueryText: string | null;
+  } | null>(null);
   const [history, setHistory] = useLocalStorageState<HistoryEntry[]>(HISTORY_STORAGE_KEY, []);
 
   const [result, setResult] = useState<QueryResult | null>(null);
@@ -188,18 +202,62 @@ export const QueryEditorTab: React.FC = () => {
     );
   };
 
-  const loadHistoryEntry = (entry: HistoryEntry) => {
-    editorRef.current?.setValue(entry.pyql);
-    setQueryText(entry.pyql);
+  // Shared by both preview and load — the only difference between them is
+  // whether the panel stays open afterward (see previewEntry/loadEntry).
+  const applyToEditor = (
+    pyql: string,
+    nextParamValues: Record<string, string>,
+    nextResult: QueryResult | null,
+    nextError: QueryErrorInfo | null,
+    nextLastRunQueryText: string | null
+  ) => {
+    editorRef.current?.setValue(pyql);
+    setQueryText(pyql);
+    setParamValues(nextParamValues);
+    setParamsResetKey((k) => k + 1);
+    setResult(nextResult);
+    setError(nextError);
+    setLastRunQueryText(nextLastRunQueryText);
+  };
+
+  const openHistory = () => {
+    historyDraftRef.current = {queryText, paramValues, result, error, lastRunQueryText};
+    setHistoryPreviewId(null);
+    setHistoryOpen(true);
+  };
+
+  // Only updates the live editor/result panes — doesn't touch `history`
+  // itself or close the panel, so you can click/arrow through past entries
+  // and look at each one without committing to anything (see loadEntry for
+  // the "actually apply this" action).
+  const previewDraft = () => {
+    if (historyPreviewId === null) return;
+    const draft = historyDraftRef.current;
+    if (draft) applyToEditor(draft.queryText, draft.paramValues, draft.result, draft.error, draft.lastRunQueryText);
+    setHistoryPreviewId(null);
+  };
+
+  const previewEntry = (entry: HistoryEntry) => {
+    if (historyPreviewId === entry.id) return;
     // Fallbacks guard against entries persisted before result/param caching
     // was added — localStorage may still hold those from an earlier session.
-    setParamValues(entry.paramValues ?? {});
-    setParamsResetKey((k) => k + 1);
-    setResult(entry.result ?? null);
-    setError(entry.error ?? null);
-    setLastRunQueryText(entry.pyql);
+    applyToEditor(entry.pyql, entry.paramValues ?? {}, entry.result ?? null, entry.error ?? null, entry.pyql);
+    setHistoryPreviewId(entry.id);
+  };
+
+  const loadEntry = (entry: HistoryEntry) => {
+    applyToEditor(entry.pyql, entry.paramValues ?? {}, entry.result ?? null, entry.error ?? null, entry.pyql);
+    setHistoryPreviewId(entry.id);
     setHistoryOpen(false);
   };
+
+  const cancelHistory = () => {
+    const draft = historyDraftRef.current;
+    if (draft) applyToEditor(draft.queryText, draft.paramValues, draft.result, draft.error, draft.lastRunQueryText);
+    setHistoryOpen(false);
+  };
+
+  const toggleHistory = () => (historyOpen ? cancelHistory() : openHistory());
 
   // Same enableOnContentEditable/enableOnFormTags/capture+stopPropagation fix
   // as the REPL — CodeMirror's role="textbox" content div needs both opt-outs,
@@ -219,7 +277,7 @@ export const QueryEditorTab: React.FC = () => {
     (event) => {
       event.preventDefault();
       event.stopPropagation();
-      setHistoryOpen((open) => !open);
+      toggleHistory();
     },
     {enableOnContentEditable: true, enableOnFormTags: true, eventListenerOptions: {capture: true}}
   );
@@ -230,7 +288,7 @@ export const QueryEditorTab: React.FC = () => {
       <div className="flex h-11 shrink-0 items-center gap-2 bg-header border-b border-border px-2">
         <button
           type="button"
-          onClick={() => setHistoryOpen((open) => !open)}
+          onClick={toggleHistory}
           title="History (Mod+H)"
           className="flex h-6 w-6 items-center justify-center rounded text-fg-muted hover:bg-surface-hover hover:text-fg"
         >
@@ -276,8 +334,11 @@ export const QueryEditorTab: React.FC = () => {
         <HistoryPanel
           entries={history}
           open={historyOpen}
-          onClose={() => setHistoryOpen(false)}
-          onSelect={loadHistoryEntry}
+          previewedId={historyPreviewId}
+          onPreviewDraft={previewDraft}
+          onPreviewEntry={previewEntry}
+          onLoadEntry={loadEntry}
+          onCancel={cancelHistory}
         />
 
         <Group orientation={orientation} className="min-w-0 flex-1">
