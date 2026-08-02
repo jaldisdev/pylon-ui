@@ -86,12 +86,14 @@ export const ScalarValue: React.FC<ScalarValueProps> = ({value, typeTag, compact
     );
   }
 
-  if (typeTag?.kind === "decimal" && typeof value === "number") {
+  if (typeTag?.kind === "decimal" && (typeof value === "number" || typeof value === "string")) {
     // Always at least one fractional digit (a bare "1399" reads as an int)
     // and a trailing "n" marking it decimal, not float — schema/shape info
     // already tells us this is a decimal for certain, so this doesn't need
-    // forceFloat's heuristic the way a plain float does.
-    const text = Number.isInteger(value) ? `${value}.0` : String(value);
+    // forceFloat's heuristic the way a plain float does. A pending Data
+    // Explorer edit's own value is a string (see extractParams.ts's
+    // coerceParamValue) — a fetched result value is still a plain number.
+    const text = typeof value === "string" ? (value.includes(".") ? value : `${value}.0`) : Number.isInteger(value) ? `${value}.0` : String(value);
     return (
       <span className="text-(--syntax-number)">
         {text}

@@ -125,6 +125,12 @@ export const extractParams = (query: string): ExtractedParam[] => {
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const INT_RE = /^-?\d+$/;
 const FLOAT_RE = /^-?\d+(\.\d+)?$/;
+// Same shape as FLOAT_RE, plus PyQL's own decimal-literal suffix (`9.99n`) —
+// the Data Explorer's read-only ScalarValue renders decimal values with a
+// trailing "n" to match that literal syntax, so typed input has to accept
+// (and strip, in coerceParamValue below) the same suffix instead of
+// rejecting it or letting it fall through into the bound parameter value.
+const DECIMAL_RE = /^-?\d+(\.\d+)?n?$/;
 const LOCAL_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const LOCAL_TIME_RE = /^\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
 const LOCAL_DATETIME_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
@@ -158,8 +164,9 @@ export const validateCastValue = (raw: string, castType: string | null): string 
       return INT_RE.test(raw) ? null : "Expected an integer";
     case "float32":
     case "float64":
-    case "decimal":
       return FLOAT_RE.test(raw) ? null : "Expected a number";
+    case "decimal":
+      return DECIMAL_RE.test(raw) ? null : "Expected a number";
     case "bool":
       return /^(true|false)$/i.test(raw) ? null : "Expected true or false";
     case "json":
