@@ -176,8 +176,13 @@ export const validateCastValue = (raw: string, castType: string | null): string 
       } catch {
         return "Expected valid JSON";
       }
+    // Bare `<date>`/`<time>` (module std, no schema pointer ever reports
+    // these — introspection always resolves to the cal:: form below) share
+    // the same textual shape as their cal::local_* counterparts.
+    case "date":
     case "local_date":
       return LOCAL_DATE_RE.test(raw) ? null : "Expected YYYY-MM-DD";
+    case "time":
     case "local_time":
       return LOCAL_TIME_RE.test(raw) ? null : "Expected HH:MM[:SS]";
     case "local_datetime":
@@ -185,6 +190,8 @@ export const validateCastValue = (raw: string, castType: string | null): string 
     case "datetime":
       return DATETIME_RE.test(raw) ? null : "Expected an ISO datetime";
     case "duration":
+    case "relative_duration":
+    case "date_duration":
       return DURATION_RE.test(raw) ? null : "Expected a duration, e.g. '1 hour 30 minutes'";
     case "bytes":
       return raw.length > 0 ? null : "Expected a value";
