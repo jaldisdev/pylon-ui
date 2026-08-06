@@ -18,11 +18,12 @@
 //
 
 import type React from "react";
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {Navigate, useParams} from "react-router-dom";
 import {useHotkeys} from "react-hotkeys-hook";
 
 import {useSchema} from "@/lib/api/useSchema";
+import {useSessionStorageState} from "@/lib/hooks/useLocalStorageState";
 import {Card} from "@/ui/Card";
 import {ComingSoon} from "@/ui/ComingSoon";
 import {NotFound} from "@/ui/NotFound";
@@ -41,6 +42,13 @@ export const DataExplorerTab: React.FC = () => {
   const hasPendingEdits = useHasPendingEdits();
   const [reviewOpen, setReviewOpen] = useState(false);
 
+  // Remembers the last splat (type + nested link-view stack) visited in this
+  // tab session — sidebar/mobile nav always link to the bare "data" path
+  // with no splat, so without this, navigating away (e.g. to the Query
+  // Editor) and back always lost the nested view and fell back to the first
+  // type, unlike gel-ui's own Data Explorer.
+  const [lastPath, setLastPath] = useSessionStorageState<string | null>(`data-explorer-last-path:${branch}`, null);
+
   // Mod+S opens Review Changes — only meaningful once there's something
   // pending; registered here (not DataExplorerView, which remounts on every
   // nested-view navigation) so it survives drilling into a link and back.
@@ -53,6 +61,15 @@ export const DataExplorerTab: React.FC = () => {
     {enableOnContentEditable: true, enableOnFormTags: true, eventListenerOptions: {capture: true}}
   );
 
+  const stack = schema && splat ? parseStack(schema, splat) : null;
+
+  // Keep the remembered path in sync with wherever the user actually
+  // navigates to within Data Explorer — not just on mount, so drilling into
+  // a link (or switching type) updates what's restored next time.
+  useEffect(() => {
+    if (splat && stack) setLastPath(splat);
+  }, [splat, stack, setLastPath]);
+
   if (!schema) {
     return (
       <Card>
@@ -60,8 +77,6 @@ export const DataExplorerTab: React.FC = () => {
       </Card>
     );
   }
-
-  const stack = splat ? parseStack(schema, splat) : null;
 
   if (!stack) {
     if (splat) {
@@ -75,8 +90,14 @@ export const DataExplorerTab: React.FC = () => {
         </Card>
       );
     }
-    // No type in the URL at all — redirect to the first available
+    // No type in the URL at all — restore the last-visited path from this
+    // session if it still resolves against the current schema (a type
+    // could've been removed since), else fall back to the first available
     // (non-junction) type.
+    const restored = lastPath && parseStack(schema, lastPath) ? lastPath : null;
+    if (restored) {
+      return <Navigate to={`${basePath}/${restored}`} replace />;
+    }
     const first = schema.types.find((t) => !t.junction);
     return first ? (
       <Navigate to={`${basePath}/${first.module}::${first.name}`} replace />
