@@ -60,6 +60,16 @@ export const pointerTypeTag = (
     return {kind: "enum", module: enumModule, name: enumName};
   }
 
+  // A computed returning an enum has no kind of its own to say so — it names
+  // the enum in `typeName`, like any other scalar return type, so its values
+  // get real member labels only if we resolve it against the schema's enums.
+  if (pointer.kind === "computed" && pointer.typeName) {
+    const [enumModule, enumName] = pointer.typeName.split("::");
+    if (schema.enums.some((e) => e.module === enumModule && e.name === enumName)) {
+      return {kind: "enum", module: enumModule, name: enumName};
+    }
+  }
+
   if (pointer.kind === "namedTuple") {
     return {kind: "namedTuple", members: resolveTupleMembers(pointer, schema)};
   }
