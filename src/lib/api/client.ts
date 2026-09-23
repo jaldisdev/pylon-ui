@@ -353,10 +353,15 @@ export interface SchemaPointer {
   name: string;
   kind: SchemaPointerKind;
   // Present for "link"/"multiLink" (the target type's "module::Name"), for
-  // "enum" (the enum type's own "module::Name"), and for a *nominal*
+  // "enum" (the enum type's own "module::Name"), for a *nominal*
   // "namedTuple" (the named tuple type's own "module::Name" — see
-  // SchemaResponse.namedTuples).
+  // SchemaResponse.namedTuples), and for a "computed" that selects objects
+  // rather than a scalar (the type it selects — see lib/schema/pointers.ts).
   target?: string;
+  // "computed" with a `target` only — whether it selects many objects. A
+  // stored link says this through its own kind ("link" vs "multiLink");
+  // a computed one has just the one kind for both.
+  multi?: boolean;
   // "namedTuple" only, when it's a *structural* pylon.Tuple[...] (no
   // registered type to reference via `target` — the shape is declared
   // inline here instead).

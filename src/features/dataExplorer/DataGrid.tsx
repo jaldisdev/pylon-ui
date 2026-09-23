@@ -28,6 +28,7 @@ import {ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, ChevronRight, Link2, Menu, 
 import {api, type SchemaPointer, type SchemaResponse, type SchemaType} from "@/lib/api/client";
 import {floatMarkerChild} from "@/lib/api/floatMarkers";
 import {isSelfOrDescendant, qualname} from "@/lib/schema/inheritance";
+import {linksManyObjects, linksObjects} from "@/lib/schema/pointers";
 import {lookupPointerTypeTag, pointerTypeTag} from "@/lib/schema/typeTags";
 import {formatTupleType} from "@/lib/schema/tupleTypeCast";
 import {useIsMobile} from "@/lib/hooks/useIsMobile";
@@ -122,6 +123,10 @@ const isSortable = (pointer: SchemaPointer) =>
 const headerTypeLabel = (pointer: SchemaPointer): string | null => {
   if (pointer.kind === "link" || pointer.kind === "enum") return pointer.target ?? null;
   if (pointer.kind === "multiLink") return pointer.target ? `multi ${pointer.target}` : "multi";
+  // An object-valued computed names what it selects, like the link it is.
+  if (pointer.kind === "computed" && pointer.target) {
+    return linksManyObjects(pointer) ? `multi ${pointer.target}` : pointer.target;
+  }
   if (pointer.kind === "namedTuple") return pointer.target ?? (pointer.members ? formatTupleType(pointer.members) : "tuple");
   if (pointer.kind === "array") return `array<${pointer.element?.typeName ?? pointer.element?.target ?? "..."}>`;
   return pointer.typeName ?? null;
@@ -165,7 +170,7 @@ const rowObjectId = (row: DisplayRow): string | number => (row.kind === "insert"
 // preview inside it.
 const scalarPointerNames = (pointers: SchemaPointer[]): string =>
   pointers
-    .filter((p) => p.kind !== "link" && p.kind !== "multiLink")
+    .filter((p) => !linksObjects(p))
     .map((p) => `\`${p.name}\``)
     .join(", ");
 
@@ -180,11 +185,11 @@ const scalarPointerNames = (pointers: SchemaPointer[]): string =>
 const buildExpandedRowShape = (schemaType: SchemaType, schema: SchemaResponse): string =>
   schemaType.pointers
     .map((p) => {
-      if (p.kind !== "link" && p.kind !== "multiLink") return `\`${p.name}\``;
+      if (!linksObjects(p)) return `\`${p.name}\``;
       const [module, name] = (p.target ?? "").split("::");
       const targetType = schema.types.find((t) => t.module === module && t.name === name);
       const targetShape = targetType ? scalarPointerNames(targetType.pointers) : "id";
-      if (p.kind === "multiLink") {
+      if (linksManyObjects(p)) {
         return `\`${p.name}\`: { ${targetShape} } limit 10, \`__count_${p.name}\` := count(.\`${p.name}\`)`;
       }
       return `\`${p.name}\`: { ${targetShape} }`;
@@ -630,7 +635,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
             };
 
             const renderPointerCell = (pointer: SchemaPointer, style: React.CSSProperties) => {
-              const isLink = pointer.kind === "link" || pointer.kind === "multiLink";
+              const isLink = linksObjects(pointer);
               const cellEditable = isEditableCell(pointer, isInsertRow);
               const isEditing = activePropertyEdit?.objectId === objectId && activePropertyEdit.pointerName === pointer.name;
 
@@ -1014,7 +1019,7 @@ const ExpandedRowContent: React.FC<{
 };
 
 const LinkCell: React.FC<{value: unknown; pointer: SchemaPointer}> = ({value, pointer}) => {
-  const items = pointer.kind === "multiLink" ? ((value as unknown[] | null) ?? []) : value ? [value] : [];
+  const items = linksManyObjects(pointer) ? ((value as unknown[] | null) ?? []) : value ? [value] : [];
   return (
     <span className={clsx("flex items-center gap-1", items.length === 0 ? "text-fg-muted" : "text-fg")}>
       {items.length === 0 ? "{}" : `${items.length} object${items.length === 1 ? "" : "s"}`}

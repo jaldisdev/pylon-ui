@@ -26,6 +26,7 @@ import type {SchemaPointer, SchemaResponse, ValueShapeTag} from "@/lib/api/clien
 import {floatMarkerChild, isFloatMarker, type FloatMarkerTree} from "@/lib/api/floatMarkers";
 import {useSchema} from "@/lib/api/useSchema";
 import {qualname} from "@/lib/schema/inheritance";
+import {linksManyObjects, linksObjects} from "@/lib/schema/pointers";
 import {lookupPointerTypeTag, valueShapeChild, valueShapeToPointerTypeTag} from "@/lib/schema/typeTags";
 import {ScalarValue} from "@/ui/ScalarValue";
 
@@ -180,7 +181,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({
       : undefined;
   // Used below to show a "View objects" action next to a link/multi-link
   // field — only when the caller actually wants that (see onNavigateLink).
-  const linkPointer = ownPointer && (ownPointer.kind === "link" || ownPointer.kind === "multiLink") ? ownPointer : undefined;
+  const linkPointer = ownPointer && linksObjects(ownPointer) ? ownPointer : undefined;
 
   // A tuple/named-tuple value is JS-object-shaped (a dict or array) but
   // renders as a single tuple literal `(x := 1, y := 2)`, not as an
@@ -212,7 +213,7 @@ const JsonNode: React.FC<JsonNodeProps> = ({
     // for a real array<T> property), even though the JS value itself is a
     // plain array either way. The root array is always a query's own result
     // set too (see isRoot above), for the same reason.
-    const isMultiLinkSet = ownPointer?.kind === "multiLink";
+    const isMultiLinkSet = ownPointer !== undefined && linksManyObjects(ownPointer);
     const isRootSet = isRoot && isArray;
     const useListBrackets = isArray && !isMultiLinkSet && !isRootSet;
     const itemWord = isMultiLinkSet || isRootSet ? "object" : isArray ? "item" : "key";

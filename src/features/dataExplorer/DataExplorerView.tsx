@@ -35,6 +35,7 @@ import {ObjectTypeSelect} from "@/features/dataExplorer/ObjectTypeSelect";
 import {parseInsertIndex, stackToPath, type StackEntry} from "@/features/dataExplorer/stack";
 import {useDataEditsStore} from "@/features/dataExplorer/state/editsStore";
 import {qualname} from "@/lib/schema/inheritance";
+import {linksObjects} from "@/lib/schema/pointers";
 
 type Row = Record<string, unknown>;
 
@@ -54,9 +55,13 @@ interface DataExplorerViewProps {
 // type's own properties, e.g. `@weight` — confirmed working directly against
 // pylon-core: a bare `@name` in a nested shape reads the link property off
 // that specific edge, no different from `@name := expr` on the write side.
-const buildShape = (pointers: {name: string; kind: string}[], linkPropNames: string[] = []) =>
+const buildShape = (pointers: SchemaPointer[], linkPropNames: string[] = []) =>
   [
-    ...pointers.map((p) => (p.kind === "link" || p.kind === "multiLink" ? `${p.name}: {id}` : p.name)),
+    // An object-valued pointer is read as ids only — the grid shows a count
+    // and walks into it for the rest. Left bare, a computed one comes back as
+    // whole objects (Pylon gives an unshaped object pointer an implicit
+    // `{ id }`), which the cell then has nothing better to do with than print.
+    ...pointers.map((p) => (linksObjects(p) ? `${p.name}: {id}` : p.name)),
     ...linkPropNames.map((name) => `@${name}`),
   ].join(", ");
 
