@@ -18,15 +18,19 @@
 //
 
 import {useQuery} from "@tanstack/react-query";
+import {useParams} from "react-router-dom";
 
 import {api} from "@/lib/api/client";
 
 // Settable session globals declared in the schema (Global[T], not the
 // computed Global[T, "select ..."] kind) — powers the globals modal's form
-// and the pill bar's field labels/types.
-export const useGlobalsSchema = () =>
-  useQuery({
-    queryKey: ["globals-schema"],
+// and the pill bar's field labels/types. Keyed by `branch` alongside
+// useSchema: globals come from the same per-connection schema snapshot.
+export const useGlobalsSchema = () => {
+  const {branch} = useParams();
+  return useQuery({
+    queryKey: ["globals-schema", branch],
     queryFn: api.getGlobals,
     staleTime: Infinity,
   });
+};

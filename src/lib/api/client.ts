@@ -138,16 +138,17 @@ const fetchQueryResponse = async (path: string, init: RequestInit): Promise<Quer
   return {...(JSON.parse(text) as QueryResponse), floatMarkers: extractFloatMarkers(text, ["objects"])};
 };
 
-// Process-level routes (schema/globals/connections/models) are derived from
-// pylon.finalize()'s schema-dir scan or the TOML config itself, never from a
-// live DB round trip — identical regardless of which connection is
-// selected, so they're never prefixed.
+// Process-level routes (connections/models/config-options) come from the
+// TOML config itself, never from a live DB round trip — identical
+// regardless of which connection is selected, so they're never prefixed.
 const request = <T>(path: string, init?: RequestInit): Promise<T> => doFetch<T>(path, init);
 
-// Routes that actually read/write database data (query/stats/ai-chat) are
-// addressed as /api/<connection>/<path>, matching the backend's
-// _split_connection_path (pylon/server/asgi.py) and the frontend's own
-// /<branch>/... URL scheme.
+// Routes that read a specific database (schema/globals/query/stats/ai-chat)
+// are addressed as /api/<connection>/<path>, matching the backend's
+// split_connection_path (crates/pylon-server/src/server.rs) and the
+// frontend's own /<branch>/... URL scheme. Schema and globals belong here
+// too: each connection has its own migration history, so they describe the
+// selected database, not the process.
 const connectionRequest = <T>(path: string, init?: RequestInit): Promise<T> =>
   doFetch<T>(`/${currentConnection()}${path}`, init);
 
@@ -157,7 +158,7 @@ const connectionRequest = <T>(path: string, init?: RequestInit): Promise<T> =>
 // `(x := 1, y := 2)` tuple literal syntax) for values that aren't a known
 // schema pointer, e.g. a bare top-level cast or a tuple nested inside a free
 // object, the same way it already does for object properties via
-// /api/schema. `null` means "no special tag for this value" (a plain
+// /api/<connection>/schema. `null` means "no special tag for this value" (a plain
 // scalar). See pylon/query.py's shape_value_tags().
 export type ValueShapeTag =
   | {kind: "enum"; enumType: string}
@@ -317,10 +318,10 @@ const sessionExtras = () => ({
 });
 
 export const api = {
-  getSchema: () => request<SchemaResponse>("/schema"),
+  getSchema: () => connectionRequest<SchemaResponse>("/schema"),
   getConnections: () => request<ConnectionsResponse>("/connections"),
   getModels: () => request<ModelsResponse>("/models"),
-  getGlobals: () => request<GlobalsResponse>("/globals"),
+  getGlobals: () => connectionRequest<GlobalsResponse>("/globals"),
   getConfigOptions: () => request<ConfigOptionsResponse>("/config-options"),
   getStats: () => connectionRequest<StatsResponse>("/stats"),
   runQuery: (pyql: string, params?: Record<string, unknown>, signal?: AbortSignal) =>
