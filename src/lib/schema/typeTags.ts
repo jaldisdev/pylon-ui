@@ -168,6 +168,16 @@ const valueShapeMemberToNamedTupleMember = (m: {key: string | null; shape: Value
       members: valueShapeTupleMembers(shape, schema),
     };
   }
+  if (shape?.kind === "decimal") {
+    // Spelled the way the schema spells a decimal member, so memberTypeTag
+    // resolves a tuple read in the Query Editor (which has only the value
+    // shape to go on) and one read in the Data Explorer (which has the
+    // schema) through the same check. Without it the member falls through
+    // as an untagged scalar and renders as the quoted string the value
+    // arrives as — a decimal travels as its own digits, since JSON's number
+    // cannot hold them (see pylon's `DecodedValue::JsonNumber`).
+    return {name: m.key, kind: "scalar", typeName: "std::decimal"};
+  }
   return {name: m.key, kind: "scalar"};
 };
 
